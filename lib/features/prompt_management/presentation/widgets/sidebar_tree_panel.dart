@@ -70,30 +70,43 @@ class SidebarTreePanel extends StatelessWidget {
   }
 
   Widget _buildFolderTile(BuildContext context, PromptFolder folder, int depth) {
-    return ExpansionTile(
-      initiallyExpanded: true,
-      leading: Icon(Icons.folder_open, color: Colors.orange.shade300),
-      title: Text(folder.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-      children: [
-        for (var subFolder in folder.subFolders)
-            Padding(
-                padding: EdgeInsets.only(left: 16.0 * (depth + 1)),
-                child: _buildFolderTile(context, subFolder, depth + 1),
-            ),
-        for (var prompt in folder.prompts)
-            _buildPromptTile(context, prompt, depth + 1),
-      ],
+    return GestureDetector(
+      onSecondaryTapDown: (details) => _showFolderContextMenu(context, details, folder),
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        leading: Icon(Icons.folder_open, color: Colors.orange.shade300),
+        title: Text(folder.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          for (var subFolder in folder.subFolders)
+              Padding(
+                  padding: EdgeInsets.only(left: 16.0 * (depth + 1)),
+                  child: _buildFolderTile(context, subFolder, depth + 1),
+              ),
+          for (var prompt in folder.prompts)
+              _buildPromptTile(context, prompt, depth + 1),
+        ],
+      ),
     );
   }
 
   Widget _buildPromptTile(BuildContext context, Prompt prompt, int depth) {
     final provider = context.read<PromptProvider>();
+    
+    // Extract first line of template as headline
+    String headline = prompt.template.split('\n').first.trim();
+    if (headline.length > 50) {
+      headline = '${headline.substring(0, 50)}...';
+    }
+    if (headline.isEmpty) {
+      headline = 'No content';
+    }
+    
     return Padding(
       padding: EdgeInsets.only(left: 16.0 * depth),
       child: ListTile(
         leading: Icon(Bootstrap.lightning_charge, size: 18, color: Theme.of(context).colorScheme.secondary),
         title: Text(prompt.name),
-        subtitle: Text(prompt.description, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis),
         onTap: () {
           provider.openPromptInTab(prompt);
         },
@@ -200,6 +213,88 @@ class SidebarTreePanel extends StatelessWidget {
               }
             },
             child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFolderContextMenu(BuildContext context, TapDownDetails details, PromptFolder folder) {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    
+    showMenu(
+      context: context,
+      position: RelativeRect.fromRect(
+        details.globalPosition & const Size(40, 40),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'rename',
+          child: const Row(
+            children: [
+              Icon(Icons.edit, size: 16),
+              SizedBox(width: 8),
+              Text('Rename'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete, size: 16, color: Colors.red.shade600),
+              const SizedBox(width: 8),
+              Text('Delete', style: TextStyle(color: Colors.red.shade600)),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'rename') {
+        _showRenameFolderDialog(context, folder);
+      } else if (value == 'delete') {
+        // TODO: Implement delete folder functionality
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Delete folder functionality coming soon!')),
+        );
+      }
+    });
+  }
+
+  void _showRenameFolderDialog(BuildContext context, PromptFolder folder) {
+    final TextEditingController controller = TextEditingController(text: folder.name);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename Folder'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Folder Name',
+            hintText: 'Enter new folder name',
+          ),
+          autofocus: true,
+          onSubmitted: (value) {
+            if (value.trim().isNotEmpty) {
+              context.read<PromptProvider>().renameFolder(folder.id, value.trim());
+              Navigator.pop(context);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                context.read<PromptProvider>().renameFolder(folder.id, controller.text.trim());
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Rename'),
           ),
         ],
       ),

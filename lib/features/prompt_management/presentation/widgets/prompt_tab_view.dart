@@ -106,7 +106,19 @@ class _PromptTabViewState extends State<PromptTabView> with AutomaticKeepAliveCl
           ),
           const SizedBox(height: 24),
           
-          _buildSectionHeader(context, "Template Editor", Icons.code),
+          Row(
+            children: [
+              Expanded(child: _buildSectionHeader(context, "Template Editor", Icons.code)),
+              ElevatedButton.icon(
+                onPressed: _addVariable,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add Variable'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+            ],
+          ),
           CodeTheme(
             data: CodeThemeData(styles: isDark ? monokaiSublimeTheme : atomOneLightTheme),
             child: CodeField(
@@ -184,6 +196,40 @@ class _PromptTabViewState extends State<PromptTabView> with AutomaticKeepAliveCl
         ],
       ),
     );
+  }
+
+  void _addVariable() {
+    final newVariableName = 'new_variable';
+    final newVariableTemplate = '{{$newVariableName}}';
+    
+    // Get current text
+    final currentText = _codeController.text;
+    
+    // Get cursor position, default to end of text if no selection
+    int cursorPosition = _codeController.selection.base.offset;
+    if (cursorPosition < 0 || cursorPosition > currentText.length) {
+      cursorPosition = currentText.length;
+    }
+    
+    // Insert new variable at cursor position
+    final newText = currentText.substring(0, cursorPosition) + 
+                   newVariableTemplate + 
+                   currentText.substring(cursorPosition);
+    
+    // Update the controller
+    _codeController.text = newText;
+    
+    // Update the prompt template
+    widget.prompt.template = newText;
+    
+    // Set cursor position after the inserted variable
+    _codeController.selection = TextSelection.collapsed(
+      offset: cursorPosition + newVariableTemplate.length
+    );
+    
+    // Update variables list
+    _extractVariables();
+    setState(() {});
   }
 
   @override

@@ -121,4 +121,22 @@ class PromptProvider extends ChangeNotifier {
       _addPromptToSubFolder(prompt, folderId, subFolder);
     }
   }
+
+  void renameFolder(String folderId, String newName) {
+    _renameFolderRecursive(_folders, folderId, newName);
+    notifyListeners();
+  }
+
+  void _renameFolderRecursive(List<PromptFolder> folders, String folderId, String newName) {
+    for (var folder in folders) {
+      if (folder.id == folderId) {
+        // Use copyWith method to create updated folder
+        final updatedFolder = folder.copyWith(name: newName);
+        final index = folders.indexOf(folder);
+        folders[index] = updatedFolder;
+        return;
+      }
+      _renameFolderRecursive(folder.subFolders, folderId, newName);
+    }
+  }
 } 

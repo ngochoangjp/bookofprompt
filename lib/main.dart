@@ -27,6 +27,20 @@ class PromptManagerApp extends StatelessWidget {
         theme: AppTheme.lightTheme, // Light theme from your specs
         darkTheme: AppTheme.darkTheme, // Dark theme from your specs
         themeMode: ThemeMode.system, // Or allow user to choose
+        builder: (context, child) {
+          // Platform-specific optimizations
+          if (defaultTargetPlatform == TargetPlatform.windows) {
+            // Override text scaling for better rendering on Windows
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaleFactor: 1.0, // Force text scale to 1.0 on Windows
+              ),
+              child: child!,
+            );
+          }
+          // Other platforms use default behavior
+          return child!;
+        },
         home: const PromptManagerScreen(),
       ),
     );
