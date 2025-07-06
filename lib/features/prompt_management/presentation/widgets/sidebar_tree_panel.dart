@@ -19,6 +19,18 @@ class SidebarTreePanel extends StatelessWidget {
             backgroundColor: theme.colorScheme.surface,
             title: Text("Prompts", style: theme.textTheme.headlineSmall),
             toolbarHeight: 48,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.create_new_folder, size: 20),
+                onPressed: () => _showCreateFolderDialog(context),
+                tooltip: 'Create New Folder',
+              ),
+              IconButton(
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: () => _showCreatePromptDialog(context),
+                tooltip: 'Create New Prompt',
+              ),
+            ],
         ),
         body: Column(
         children: [
@@ -87,6 +99,109 @@ class SidebarTreePanel extends StatelessWidget {
         },
         dense: true,
         visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
+
+  void _showCreateFolderDialog(BuildContext context) {
+    final TextEditingController controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create New Folder'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Folder Name',
+            hintText: 'Enter folder name',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                context.read<PromptProvider>().createNewFolder(controller.text.trim());
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCreatePromptDialog(BuildContext context) {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController descController = TextEditingController();
+    final provider = context.read<PromptProvider>();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create New Prompt'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Prompt Name',
+                hintText: 'Enter prompt name',
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                hintText: 'Enter description',
+              ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Folder',
+                hintText: 'Select folder',
+              ),
+              items: provider.folders.map((folder) => DropdownMenuItem(
+                value: folder.id,
+                child: Text(folder.name),
+              )).toList(),
+              onChanged: (value) {
+                // Store selected folder ID
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (nameController.text.trim().isNotEmpty && 
+                  descController.text.trim().isNotEmpty) {
+                // Use first folder as default if no selection
+                final folderId = provider.folders.isNotEmpty ? provider.folders.first.id : '';
+                provider.createNewPrompt(
+                  nameController.text.trim(),
+                  descController.text.trim(),
+                  folderId,
+                );
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
       ),
     );
   }

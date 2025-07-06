@@ -1,0 +1,3 @@
+     cd "H:\This\This\My APP\Bookofshadow\bookofprompt"
+     flutter pub get
+     flutter run

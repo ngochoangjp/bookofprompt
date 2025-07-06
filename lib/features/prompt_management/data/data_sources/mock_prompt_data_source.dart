@@ -34,9 +34,9 @@ class MockPromptDataSource {
                   description: 'Draft for a new subscriber.',
                   template: 'Draft a friendly and informative welcome email for a new subscriber to our "{{newsletter_name}}" newsletter. Mention our top feature: {{top_feature}}.',
                 )
-             ]
+             ],
            )
-        ]
+        ],
       ),
       PromptFolder(
         id: 'f2',

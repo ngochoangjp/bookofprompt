@@ -77,4 +77,48 @@ class PromptProvider extends ChangeNotifier {
     notifyListeners();
     return generatedText;
   }
+
+  void createNewFolder(String name) {
+    final newFolder = PromptFolder(
+      id: _uuid.v4(),
+      name: name,
+      prompts: [],
+      subFolders: [],
+    );
+    _folders.add(newFolder);
+    notifyListeners();
+  }
+
+  void createNewPrompt(String name, String description, String folderId) {
+    final newPrompt = Prompt(
+      id: _uuid.v4(),
+      name: name,
+      description: description,
+      template: 'Enter your prompt template here...',
+    );
+
+    // Find the folder and add the prompt
+    _addPromptToFolder(newPrompt, folderId);
+    notifyListeners();
+  }
+
+  void _addPromptToFolder(Prompt prompt, String folderId) {
+    for (var folder in _folders) {
+      if (folder.id == folderId) {
+        folder.prompts.add(prompt);
+        return;
+      }
+      _addPromptToSubFolder(prompt, folderId, folder);
+    }
+  }
+
+  void _addPromptToSubFolder(Prompt prompt, String folderId, PromptFolder folder) {
+    for (var subFolder in folder.subFolders) {
+      if (subFolder.id == folderId) {
+        subFolder.prompts.add(prompt);
+        return;
+      }
+      _addPromptToSubFolder(prompt, folderId, subFolder);
+    }
+  }
 } 

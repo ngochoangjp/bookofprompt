@@ -21,9 +21,10 @@ class PromptFolder {
   PromptFolder({
     required this.id,
     required this.name,
-    this.prompts = const [],
-    this.subFolders = const [],
-  });
+    List<Prompt>? prompts,
+    List<PromptFolder>? subFolders,
+  }) : prompts = prompts ?? [],
+       subFolders = subFolders ?? [];
 }
 
 class GeneratedPromptHistory {
