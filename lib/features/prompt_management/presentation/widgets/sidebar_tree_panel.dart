@@ -103,15 +103,18 @@ class SidebarTreePanel extends StatelessWidget {
     
     return Padding(
       padding: EdgeInsets.only(left: 16.0 * depth),
-      child: ListTile(
-        leading: Icon(Bootstrap.lightning_charge, size: 18, color: Theme.of(context).colorScheme.secondary),
-        title: Text(prompt.name),
-        subtitle: Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis),
-        onTap: () {
-          provider.openPromptInTab(prompt);
-        },
-        dense: true,
-        visualDensity: VisualDensity.compact,
+      child: GestureDetector(
+        onSecondaryTapDown: (details) => _showPromptContextMenu(context, details, prompt),
+        child: ListTile(
+          leading: Icon(Bootstrap.lightning_charge, size: 18, color: Theme.of(context).colorScheme.secondary),
+          title: Text(prompt.name),
+          subtitle: Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis),
+          onTap: () {
+            provider.openPromptInTab(prompt);
+          },
+          dense: true,
+          visualDensity: VisualDensity.compact,
+        ),
       ),
     );
   }
@@ -153,6 +156,7 @@ class SidebarTreePanel extends StatelessWidget {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController descController = TextEditingController();
     final provider = context.read<PromptProvider>();
+    String? selectedFolderId;
     
     showDialog(
       context: context,
@@ -173,9 +177,10 @@ class SidebarTreePanel extends StatelessWidget {
             TextField(
               controller: descController,
               decoration: const InputDecoration(
-                labelText: 'Description',
+                labelText: 'Description (Optional)',
                 hintText: 'Enter description',
               ),
+              maxLines: 3,
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
@@ -188,7 +193,7 @@ class SidebarTreePanel extends StatelessWidget {
                 child: Text(folder.name),
               )).toList(),
               onChanged: (value) {
-                // Store selected folder ID
+                selectedFolderId = value;
               },
             ),
           ],
@@ -200,13 +205,12 @@ class SidebarTreePanel extends StatelessWidget {
           ),
           TextButton(
             onPressed: () {
-              if (nameController.text.trim().isNotEmpty && 
-                  descController.text.trim().isNotEmpty) {
+              if (nameController.text.trim().isNotEmpty) {
                 // Use first folder as default if no selection
-                final folderId = provider.folders.isNotEmpty ? provider.folders.first.id : '';
+                final folderId = selectedFolderId ?? (provider.folders.isNotEmpty ? provider.folders.first.id : '');
                 provider.createNewPrompt(
                   nameController.text.trim(),
-                  descController.text.trim(),
+                  descController.text.trim(), // Can be empty now
                   folderId,
                 );
                 Navigator.pop(context);
@@ -254,10 +258,7 @@ class SidebarTreePanel extends StatelessWidget {
       if (value == 'rename') {
         _showRenameFolderDialog(context, folder);
       } else if (value == 'delete') {
-        // TODO: Implement delete folder functionality
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Delete folder functionality coming soon!')),
-        );
+        _showDeleteFolderDialog(context, folder);
       }
     });
   }
@@ -295,6 +296,284 @@ class SidebarTreePanel extends StatelessWidget {
               }
             },
             child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteFolderDialog(BuildContext context, PromptFolder folder) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Folder'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete "${folder.name}"?'),
+            const SizedBox(height: 8),
+            Text('This will permanently delete:'),
+            const SizedBox(height: 4),
+            Text('• ${folder.prompts.length} prompt(s)'),
+            Text('• ${folder.subFolders.length} subfolder(s)'),
+            const SizedBox(height: 8),
+            const Text(
+              'This action cannot be undone.',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              context.read<PromptProvider>().deleteFolder(folder.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Deleted folder "${folder.name}" successfully!')),
+              );
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPromptContextMenu(BuildContext context, TapDownDetails details, Prompt prompt) {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    
+    showMenu(
+      context: context,
+      position: RelativeRect.fromRect(
+        details.globalPosition & const Size(40, 40),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'rename',
+          child: const Row(
+            children: [
+              Icon(Icons.edit, size: 16),
+              SizedBox(width: 8),
+              Text('Rename'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'duplicate',
+          child: const Row(
+            children: [
+              Icon(Icons.copy, size: 16),
+              SizedBox(width: 8),
+              Text('Duplicate'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'move',
+          child: const Row(
+            children: [
+              Icon(Icons.drive_file_move, size: 16),
+              SizedBox(width: 8),
+              Text('Move'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete, size: 16, color: Colors.red.shade600),
+              const SizedBox(width: 8),
+              Text('Delete', style: TextStyle(color: Colors.red.shade600)),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'rename') {
+        _showEditPromptDialog(context, prompt);
+      } else if (value == 'duplicate') {
+        _showDuplicatePromptDialog(context, prompt);
+      } else if (value == 'move') {
+        _showMovePromptDialog(context, prompt);
+      } else if (value == 'delete') {
+        _showDeletePromptDialog(context, prompt);
+      }
+    });
+  }
+
+  void _showEditPromptDialog(BuildContext context, Prompt prompt) {
+    final TextEditingController nameController = TextEditingController(text: prompt.name);
+    final TextEditingController descController = TextEditingController(text: prompt.description);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Prompt'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Prompt Name',
+                hintText: 'Enter prompt name',
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descController,
+              decoration: const InputDecoration(
+                labelText: 'Description (Optional)',
+                hintText: 'Enter description',
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (nameController.text.trim().isNotEmpty) {
+                context.read<PromptProvider>().updatePromptDetails(
+                  prompt.id, 
+                  nameController.text.trim(),
+                  descController.text.trim(),
+                );
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDuplicatePromptDialog(BuildContext context, Prompt prompt) {
+    final TextEditingController controller = TextEditingController(text: '${prompt.name} (Copy)');
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Duplicate Prompt'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'New Prompt Name',
+            hintText: 'Enter name for duplicated prompt',
+          ),
+          autofocus: true,
+          onSubmitted: (value) {
+            if (value.trim().isNotEmpty) {
+              context.read<PromptProvider>().duplicatePrompt(prompt.id, value.trim());
+              Navigator.pop(context);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                context.read<PromptProvider>().duplicatePrompt(prompt.id, controller.text.trim());
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Duplicate'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMovePromptDialog(BuildContext context, Prompt prompt) {
+    final provider = context.read<PromptProvider>();
+    final folders = provider.getAllFolders();
+    String? selectedFolderId;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Move Prompt'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Move "${prompt.name}" to:'),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Target Folder',
+                hintText: 'Select folder',
+              ),
+              items: folders.map((folder) => DropdownMenuItem(
+                value: folder.id,
+                child: Text(folder.name),
+              )).toList(),
+              onChanged: (value) {
+                selectedFolderId = value;
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (selectedFolderId != null) {
+                provider.movePrompt(prompt.id, selectedFolderId!);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Moved "${prompt.name}" successfully!')),
+                );
+              }
+            },
+            child: const Text('Move'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeletePromptDialog(BuildContext context, Prompt prompt) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Prompt'),
+        content: Text('Are you sure you want to delete "${prompt.name}"?\n\nThis action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              context.read<PromptProvider>().deletePrompt(prompt.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Deleted "${prompt.name}" successfully!')),
+              );
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
           ),
         ],
       ),

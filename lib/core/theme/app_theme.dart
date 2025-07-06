@@ -20,7 +20,7 @@ class AppTheme {
     surfaceVariant: Color(0xFFF1F5F9), // Light gray for cards
     onSurfaceVariant: Color(0xFF64748B),
     outline: Color(0xFFE2E8F0),
-    shadow: Color(0xFF000000).withOpacity(0.04),
+    shadow: Color(0x0A000000),
   );
 
   // Modern Dark Theme Colors with better contrast and warmer tones
@@ -41,7 +41,7 @@ class AppTheme {
     surfaceVariant: Color(0xFF334155), // Medium slate for cards
     onSurfaceVariant: Color(0xFFCBD5E1),
     outline: Color(0xFF475569),
-    shadow: Color(0xFF000000).withOpacity(0.2),
+    shadow: Color(0x33000000),
   );
 
   // Modern Typography with better hierarchy and readability
@@ -144,7 +144,7 @@ class AppTheme {
   // Modern component themes
   static final _lightComponentThemes = {
     // Cards with subtle shadows and rounded corners
-    'cardTheme': CardTheme(
+    'cardTheme': CardThemeData(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -241,7 +241,7 @@ class AppTheme {
 
   static final _darkComponentThemes = {
     // Cards for dark theme
-    'cardTheme': CardTheme(
+    'cardTheme': CardThemeData(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -341,7 +341,7 @@ class AppTheme {
     colorScheme: _lightColorScheme,
     textTheme: _textTheme,
     scaffoldBackgroundColor: _lightColorScheme.background,
-    cardTheme: _lightComponentThemes['cardTheme'] as CardTheme,
+    cardTheme: _lightComponentThemes['cardTheme'] as CardThemeData,
     elevatedButtonTheme: _lightComponentThemes['elevatedButtonTheme'] as ElevatedButtonThemeData,
     textButtonTheme: _lightComponentThemes['textButtonTheme'] as TextButtonThemeData,
     outlinedButtonTheme: _lightComponentThemes['outlinedButtonTheme'] as OutlinedButtonThemeData,
@@ -356,7 +356,7 @@ class AppTheme {
     colorScheme: _darkColorScheme,
     textTheme: _textTheme,
     scaffoldBackgroundColor: _darkColorScheme.background,
-    cardTheme: _darkComponentThemes['cardTheme'] as CardTheme,
+    cardTheme: _darkComponentThemes['cardTheme'] as CardThemeData,
     elevatedButtonTheme: _darkComponentThemes['elevatedButtonTheme'] as ElevatedButtonThemeData,
     textButtonTheme: _darkComponentThemes['textButtonTheme'] as TextButtonThemeData,
     outlinedButtonTheme: _darkComponentThemes['outlinedButtonTheme'] as OutlinedButtonThemeData,
