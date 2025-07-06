@@ -32,14 +32,44 @@ class AppTheme {
     onSurface: Color(0xFFF1F5F9),
   );
 
-  // Typography (as per document)
+  // Typography (as per document) - Optimized for Windows clarity
   static final _textTheme = TextTheme(
-    displayLarge: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w600),
-    headlineSmall: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
-    bodyLarge: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400),
-    bodyMedium: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400),
-    labelLarge: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
-    bodySmall: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
+    displayLarge: GoogleFonts.roboto(
+      fontSize: 24, 
+      fontWeight: FontWeight.w600,
+      height: 1.2,
+      letterSpacing: -0.5,
+    ),
+    headlineSmall: GoogleFonts.roboto(
+      fontSize: 18, 
+      fontWeight: FontWeight.w600,
+      height: 1.2,
+      letterSpacing: -0.2,
+    ),
+    bodyLarge: GoogleFonts.roboto(
+      fontSize: 16, 
+      fontWeight: FontWeight.w500,
+      height: 1.3,
+      letterSpacing: 0,
+    ),
+    bodyMedium: GoogleFonts.roboto(
+      fontSize: 15, 
+      fontWeight: FontWeight.w500,
+      height: 1.3,
+      letterSpacing: 0,
+    ),
+    labelLarge: GoogleFonts.roboto(
+      fontSize: 14, 
+      fontWeight: FontWeight.w600,
+      height: 1.3,
+      letterSpacing: -0.1,
+    ),
+    bodySmall: GoogleFonts.roboto(
+      fontSize: 13, 
+      fontWeight: FontWeight.w500,
+      height: 1.3,
+      letterSpacing: 0.1,
+    ),
   );
 
   static final ThemeData lightTheme = ThemeData(

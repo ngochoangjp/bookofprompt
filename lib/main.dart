@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:prompt_manager/features/prompt_management/presentation/screens/prompt_manager_screen.dart';
 import 'package:prompt_manager/features/prompt_management/presentation/providers/prompt_provider.dart';
 import 'package:prompt_manager/core/theme/app_theme.dart';
 
 void main() {
+  // Force high quality text rendering on Windows
+  if (defaultTargetPlatform == TargetPlatform.windows) {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+  }
   runApp(const PromptManagerApp());
 }
 
