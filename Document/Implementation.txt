@@ -1,0 +1,260 @@
+Tổng Quan Công Nghệ Implementation
+Dựa trên yêu cầu sử dụng Flutter cho đa nền tảng và cấu trúc code thân thiện với AI, dưới đây là bản đề xuất implementation chi tiết cho từng mục:
+
+1. Framework và Nền Tảng
+Frontend Framework
+Flutter: Framework chính cho đa nền tảng (iOS, Android, Web, Desktop)
+
+Dart: Ngôn ngữ lập trình chính, dễ học và thân thiện với AI
+
+Flutter Desktop Support: Hỗ trợ native cho Windows, macOS, Linux
+
+Kiến Trúc Ứng Dụng
+Clean Architecture: Áp dụng kiến trúc 3 tầng rõ ràng
+
+Presentation Layer: UI widgets và controllers
+
+Domain Layer: Business logic và use cases
+
+Data Layer: Repositories và data sources
+
+2. State Management
+Lựa Chọn State Management
+Provider: Đơn giản, dễ sử dụng và maintain
+
+Riverpod: Phiên bản cải tiến của Provider, type-safe
+
+BLoC: Cho ứng dụng phức tạp với nhiều tương tác
+
+Gợi Ý cho Prompt Manager App
+dart
+// Provider cho prompt management
+class PromptProvider extends ChangeNotifier {
+  List<Prompt> _prompts = [];
+  Prompt? _selectedPrompt;
+  List<GeneratedPrompt> _history = [];
+  
+  // Getters, setters và business logic
+}
+3. Database và Storage
+Local Database
+SQLite với sqflite: Cho dữ liệu structured
+
+Lưu trữ prompts, templates, folders
+
+Support CRUD operations hoàn chỉnh
+
+ACID compliance cho data integrity
+
+Key-Value Storage
+SharedPreferences: Cho app settings và preferences
+
+Hive: Alternative lightweight cho simple data
+
+flutter_secure_storage: Cho sensitive data
+
+Database Setup Example
+dart
+// SQLite setup cho prompt database
+class DatabaseHelper {
+  static Database? _database;
+  
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
+  }
+  
+  Future<Database> _initDatabase() async {
+    return await openDatabase(
+      'prompts.db',
+      version: 1,
+      onCreate: _createTables,
+    );
+  }
+}
+4. UI Components và Design System
+UI Framework
+Material Design 3: Built-in support với Flutter
+
+Custom Theme System: Cho brand consistency
+
+Responsive Design: Adaptive layouts cho mọi screen size
+
+Icon Packages
+icons_plus: Comprehensive icon collection
+
+Font Awesome, Bootstrap, Eva Icons
+
+17+ icon packs trong một package
+
+cupertino_icons: Cho iOS-style icons
+
+material_design_icons_flutter: Extended Material icons
+
+Custom Widgets Library
+dart
+// Reusable components cho app
+class PromptCard extends StatelessWidget {
+  final Prompt prompt;
+  final VoidCallback? onTap;
+  
+  const PromptCard({required this.prompt, this.onTap});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        title: Text(prompt.name),
+        subtitle: Text(prompt.description),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+5. Text Editor Components
+Rich Text Editor Options
+flutter_quill: Full-featured rich text editor
+
+appflowy_editor: Highly customizable editor
+
+flutter_rte: HTML WYSIWYG editor
+
+Code Editor cho Template
+dart
+// Sử dụng flutter_code_editor cho template editing
+import 'package:flutter_code_editor/flutter_code_editor.dart';
+
+class TemplateEditor extends StatefulWidget {
+  @override
+  _TemplateEditorState createState() => _TemplateEditorState();
+}
+
+class _TemplateEditorState extends State<TemplateEditor> {
+  late CodeController _controller;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = CodeController(
+      text: 'Template content here...',
+      language: plaintext,
+    );
+  }
+}
+6. Project Structure (AI-Friendly)
+Feature-First Architecture
+text
+lib/
+├── core/                     # Core utilities
+│   ├── constants/           # App constants
+│   ├── themes/             # App themes
+│   ├── utils/              # Utility functions
+│   └── services/           # Global services
+├── features/               # Feature modules
+│   ├── prompt_management/  # Prompt CRUD
+│   │   ├── data/
+│   │   ├── domain/
+│   │   └── presentation/
+│   ├── template_editor/    # Template editing
+│   └── history_manager/    # History functionality
+├── shared/                 # Shared components
+│   ├── widgets/           # Reusable widgets
+│   ├── models/            # Shared models
+│   └── repositories/      # Shared repositories
+└── main.dart              # Entry point
+AI-Friendly Code Organization
+Clear naming conventions: PromptManagerController, TemplateEditorWidget
+
+Single responsibility: Mỗi class có một nhiệm vụ rõ ràng
+
+Documentation comments: Đầy đủ comments cho AI hiểu context
+
+Type safety: Sử dụng strong typing trong Dart
+
+7. Development Tools và Workflow
+IDE và Extensions
+VS Code: Với Flutter và Dart extensions
+
+Android Studio: Full Flutter support
+
+Flutter Inspector: Cho UI debugging
+
+Code Generation Tools
+build_runner: Cho code generation
+
+json_annotation: Cho model serialization
+
+freezed: Cho immutable classes
+
+AI-Assisted Development
+dart
+// Example: Clear, documented code structure
+/// Manages prompt templates and generation
+class PromptController extends ChangeNotifier {
+  /// Current active prompt template
+  Prompt? _activePrompt;
+  
+  /// Generated prompt history for current session
+  List<GeneratedPrompt> _sessionHistory = [];
+  
+  /// Generates final prompt from template and variables
+  Future<String> generatePrompt(Map<String, String> variables) async {
+    // Implementation here
+  }
+}
+8. Cross-Platform Specific Configurations
+Desktop Integration
+dart
+// Desktop-specific features
+if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+  // Desktop-specific UI adaptations
+  return DesktopLayout();
+} else {
+  // Mobile layout
+  return MobileLayout();
+}
+Platform Channels (if needed)
+dart
+// Cho native functionality
+class PlatformService {
+  static const MethodChannel _channel = MethodChannel('prompt_manager');
+  
+  static Future<String> getNativeFunction() async {
+    return await _channel.invokeMethod('getNativeFunction');
+  }
+}
+9. Performance Optimization
+Lazy Loading
+dart
+// Lazy load prompts để improve performance
+class PromptRepository {
+  Future<List<Prompt>> getPrompts({int page = 0, int limit = 20}) async {
+    // Pagination implementation
+  }
+}
+Caching Strategy
+dart
+// Cache frequently used data
+class CacheService {
+  static final Map<String, dynamic> _cache = {};
+  
+  static T? get<T>(String key) => _cache[key] as T?;
+  static void set<T>(String key, T value) => _cache[key] = value;
+}
+10. Testing Strategy
+Unit Tests
+dart
+// Example unit test cho AI-friendly code
+void main() {
+  group('PromptController Tests', () {
+    test('should generate prompt with variables', () async {
+      final controller = PromptController();
+      final result = await controller.generatePrompt({
+        'name': 'John',
+        'task': 'writing'
+      });
+      expect(result, isA<String>());
+    });
+  });
+}

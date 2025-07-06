@@ -1,0 +1,124 @@
+1. Tổng Quan Ứng Dụng
+Prompt Manager là phần mềm chuyên dụng giúp tổ chức, quản lý, tạo và sử dụng các prompt AI một cách hiệu quả, trực quan. Ứng dụng được thiết kế với giao diện ba panel chính, tập trung vào trải nghiệm người dùng, tối ưu hóa quy trình làm việc và hỗ trợ các tính năng nâng cao cho cá nhân lẫn nhóm.
+
+2. Kiến Trúc Giao Diện
+2.1. Panel Trái – Cây Thư Mục Prompt (Sidebar Tree)
+Hiển thị cây thư mục phân cấp chứa các nhóm prompt.
+
+Search Box thông minh ở đầu panel:
+
+Tìm kiếm theo tên prompt, tag, hoặc nội dung.
+
+Highlight kết quả tìm kiếm trực tiếp trong cây thư mục.
+
+Drag & Drop: Kéo thả để sắp xếp lại thư mục và prompt.
+
+Context Menu (chuột phải): Menu thao tác nhanh như đổi tên, xóa, nhân bản.
+
+Breadcrumb Navigation: Hiển thị đường dẫn hiện tại, giúp định vị nhanh vị trí trong cây.
+
+Icons & Badges: Icon phân biệt loại prompt, badge hiển thị số lượng prompt trong thư mục.
+
+2.2. Panel Giữa – Khu Vực Làm Việc Chính (Main Content)
+Multiple Tabs: Mở đồng thời nhiều prompt, chuyển đổi nhanh giữa các tab.
+
+Tên Prompt & Mô Tả Ngắn: Hiển thị rõ ràng phía trên cùng.
+
+Chức Năng Prompt: Mô tả chi tiết mục đích sử dụng.
+
+Thông Tin Đầu Vào: Form nhập biến động
+
+Main Prompt: Template prompt với syntax highlighting, kiểm tra lỗi cú pháp real-time.
+
+Nút Generate: Tạo prompt cuối cùng từ template và biến đầu vào.
+
+Final Prompt: Hiển thị kết quả, kèm nút Copy Prompt với các lựa chọn:
+
+Copy dưới dạng plain text, markdown, hoặc JSON.
+
+Auto-save Drafts: Tự động lưu nháp, tránh mất dữ liệu.
+
+Undo/Redo: Hoàn tác hoặc phục hồi các thay đổi gần nhất.
+
+2.3. Panel Phải – Lịch Sử Prompt (History Sidebar)
+Lưu trữ lịch sử các prompt đã generate từ main prompt hiện tại.
+
+Sắp xếp theo thời gian (mới nhất lên trên).
+
+Search & Filter: Tìm kiếm, lọc lịch sử theo nội dung hoặc thời gian.
+
+Quick Preview: Hover để xem nhanh nội dung prompt trong lịch sử.
+
+Grouping by Date/Time: Nhóm lịch sử theo ngày, tuần, tháng.
+
+Export History: Xuất lịch sử ra file backup.
+
+
+3. Tính Năng Nâng Cao & Cải Tiến Trải Nghiệm
+Visual Feedback: Animation/toast khi copy thành công.
+
+
+Dark/Light Mode: Chuyển đổi giao diện sáng/tối.
+
+Responsive Design: Tối ưu cho mọi kích thước màn hình.
+
+Accessibility: Hỗ trợ screen reader, navigation bằng bàn phím.
+
+Thiết kế UI/UX nâng cao
+Color Scheme
+
+Light Theme:
+
+Primary: #3B82F6 (Blue)
+Secondary: #10B981 (Green)
+Background: #F8FAFC
+Surface: #FFFFFF
+Text: #1F2937
+
+
+Dark Theme:
+
+Primary: #60A5FA (Light Blue)
+Secondary: #34D399 (Light Green)
+Background: #0F172A
+Surface: #1E293B
+Text: #F1F5F9
+
+Typography
+
+Headers: Inter/Roboto 16-24px, font-weight: 600
+Body: Inter/Roboto 14px, font-weight: 400
+Code: Fira Code/Monaco 13px, monospace
+Captions: Inter/Roboto 12px, font-weight: 400
+
+Layout Responsive
+
+Desktop: 3 cột đầy đủ
+Tablet: Sidebar overlay, main content responsive
+Mobile: Stack layout, bottom navigation
+
+Favorite System
+
+Quick access: Prompt yêu thích hiển thị ở đầ
+Frontend: Flutter
+4. Quy Trình Sử Dụng Cơ Bản
+Chọn hoặc tìm kiếm prompt trong cây thư mục (có thể kéo thả, đổi tên, sắp xếp).
+
+Mở prompt ở panel giữa (có thể mở nhiều tab).
+
+Nhập thông tin biến, xem preview, chỉnh sửa template.
+
+Generate prompt và copy kết quả với định dạng mong muốn.
+
+Xem lại lịch sử, tìm kiếm, so sánh, xuất hoặc tái sử dụng prompt đã tạo.
+
+5. Lợi Ích Nổi Bật
+Tối ưu hóa quy trình làm việc với prompt AI.
+
+Tìm kiếm, tổ chức, chỉnh sửa, tái sử dụng prompt dễ dàng.
+
+Hỗ trợ workflow chuyên nghiệp cho cá nhân và nhóm.
+
+Giao diện hiện đại, linh hoạt, dễ mở rộng.
+
+Ứng dụng này là giải pháp toàn diện cho mọi nhu cầu quản lý, sáng tạo và sử dụng prompt AI, giúp tiết kiệm thời gian, tăng hiệu quả và đảm bảo trải nghiệm người dùng vượt trội.
