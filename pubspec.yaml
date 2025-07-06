@@ -17,7 +17,6 @@ dependencies:
   sqflite: ^2.3.0
   path: ^1.8.3
   shared_preferences: ^2.2.2
-  flutter_secure_storage: ^9.0.0
   
   # UI & Icons
   cupertino_icons: ^1.0.6
@@ -45,10 +44,10 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
-  build_runner: ^2.4.7
-  json_serializable: ^6.7.1
-  msix: ^2.8.18
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.13
+  json_serializable: ^6.8.0
+  msix: ^3.16.8
 
 flutter:
   uses-material-design: true
@@ -65,3 +64,20 @@ msix:
   description: Advanced Prompt Manager for AI workflows
   execution_alias: promptmanager
   logo_path: assets/icons/app_icon.png 
+
+# MSIX Configuration for Windows Store
+msix_config:
+  display_name: Prompt Manager
+  publisher_display_name: Your Company
+  identity_name: YourCompany.PromptManager
+  msix_version: 1.0.0.0
+  logo_path: windows/runner/resources/app_icon.ico
+  start_menu_icon_path: windows/runner/resources/app_icon.ico
+  tile_icon_path: windows/runner/resources/app_icon.ico
+  icons_background_color: '#1976D2'
+  architecture: x64
+  capabilities: 'internetClient,privateNetworkClientServer,documentsLibrary'
+  languages: en-us,vi-vn
+  store: false
+  sign_msix: false
+  install_certificate: false 
