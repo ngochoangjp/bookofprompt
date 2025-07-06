@@ -1,132 +1,473 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:prompt_manager/features/prompt_management/data/models/prompt_model.dart';
-import 'package:prompt_manager/features/prompt_management/presentation/providers/prompt_provider.dart';
 import 'package:icons_plus/icons_plus.dart';
+import '../providers/prompt_provider.dart';
+import '../../data/models/prompt_model.dart';
 
-class SidebarTreePanel extends StatelessWidget {
+class SidebarTreePanel extends StatefulWidget {
   const SidebarTreePanel({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<PromptProvider>();
-    final theme = Theme.of(context);
+  State<SidebarTreePanel> createState() => _SidebarTreePanelState();
+}
 
-    return Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        appBar: AppBar(
-            elevation: 0,
-            backgroundColor: theme.colorScheme.surface,
-            title: Text("Prompts", style: theme.textTheme.headlineSmall),
-            toolbarHeight: 48,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.create_new_folder, size: 20),
-                onPressed: () => _showCreateFolderDialog(context),
-                tooltip: 'Create New Folder',
+class _SidebarTreePanelState extends State<SidebarTreePanel> {
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 320,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          right: BorderSide(
+            color: Theme.of(context).colorScheme.outline,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          _buildHeader(),
+          _buildSearchBar(),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _buildTreeView(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).colorScheme.outline,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Bootstrap.folder_fill,
+            size: 20,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Prompt Library',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const Spacer(),
+          _buildActionButtons(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: 'Create New Folder',
+          child: IconButton(
+            icon: const Icon(Bootstrap.folder_plus, size: 18),
+            onPressed: () => _showCreateFolderDialog(),
+            style: IconButton.styleFrom(
+              minimumSize: const Size(32, 32),
+              padding: const EdgeInsets.all(4),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: 'Create New Prompt',
+          child: IconButton(
+            icon: const Icon(Bootstrap.plus_circle, size: 18),
+            onPressed: () => _showCreatePromptDialog(),
+            style: IconButton.styleFrom(
+              minimumSize: const Size(32, 32),
+              padding: const EdgeInsets.all(4),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: TextField(
+        controller: _searchController,
+        focusNode: _searchFocusNode,
+        decoration: InputDecoration(
+          hintText: 'Search prompts...',
+          prefixIcon: const Icon(Bootstrap.search, size: 16),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Bootstrap.x, size: 16),
+                  onPressed: () {
+                    _searchController.clear();
+                    context.read<PromptProvider>().clearSearch();
+                  },
+                )
+              : null,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        onChanged: (value) {
+          context.read<PromptProvider>().setSearchQuery(value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTreeView() {
+    return Consumer<PromptProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        if (provider.searchQuery.isNotEmpty) {
+          return _buildSearchResults(provider);
+        }
+
+        return _buildFolderTree(provider);
+      },
+    );
+  }
+
+  Widget _buildSearchResults(PromptProvider provider) {
+    final filteredPrompts = provider.filteredPrompts;
+
+    if (filteredPrompts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Bootstrap.search,
+              size: 48,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No prompts found',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              IconButton(
-                icon: const Icon(Icons.add, size: 20),
-                onPressed: () => _showCreatePromptDialog(context),
-                tooltip: 'Create New Prompt',
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      itemCount: filteredPrompts.length,
+      itemBuilder: (context, index) {
+        final prompt = filteredPrompts[index];
+        return _buildPromptTile(prompt, provider);
+      },
+    );
+  }
+
+  Widget _buildFolderTree(PromptProvider provider) {
+    return ReorderableListView(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      onReorder: (oldIndex, newIndex) {
+        if (newIndex > oldIndex) {
+          newIndex -= 1;
+        }
+        final folders = List<PromptFolder>.from(provider.folders);
+        final folder = folders.removeAt(oldIndex);
+        folders.insert(newIndex, folder);
+        provider.reorderFolders(folders);
+      },
+      children: provider.folders.map((folder) {
+        return _buildFolderTile(folder, provider);
+      }).toList(),
+    );
+  }
+
+  Widget _buildFolderTile(PromptFolder folder, PromptProvider provider) {
+    final isSelected = provider.selectedFolder?.id == folder.id;
+    final promptCount = provider.getPromptsInFolder(folder.id).length;
+
+    return Card(
+      key: ValueKey(folder.id),
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+        ),
+        child: ExpansionTile(
+          leading: Icon(
+            folder.isExpanded ? Bootstrap.folder : Bootstrap.folder_fill,
+            color: Theme.of(context).colorScheme.primary,
+            size: 18,
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  folder.name,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (promptCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    promptCount.toString(),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          onExpansionChanged: (expanded) {
+            // Update folder expansion state
+            final updatedFolder = folder.copyWith(isExpanded: expanded);
+            // Note: You might want to save this to storage
+          },
+          children: [
+            ...provider.getPromptsInFolder(folder.id).map((prompt) {
+              return _buildPromptTile(prompt, provider, isInFolder: true);
+            }),
+            if (promptCount == 0)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'No prompts in this folder',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPromptTile(PromptModel prompt, PromptProvider provider, {bool isInFolder = false}) {
+    final isSelected = provider.selectedPrompt?.id == prompt.id;
+
+    return GestureDetector(
+      onSecondaryTapDown: (details) {
+        _showPromptContextMenu(context, details.globalPosition, prompt, provider);
+      },
+      child: Card(
+        key: ValueKey(prompt.id),
+        margin: EdgeInsets.symmetric(
+          vertical: 1,
+          horizontal: isInFolder ? 16 : 0,
+        ),
+        color: isSelected
+            ? Theme.of(context).colorScheme.primaryContainer
+            : Theme.of(context).colorScheme.surface,
+        child: ListTile(
+          leading: Icon(
+            prompt.isFavorite ? Bootstrap.star_fill : Bootstrap.file_text,
+            color: prompt.isFavorite
+                ? Theme.of(context).colorScheme.tertiary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            size: 16,
+          ),
+          title: Text(
+            prompt.name,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              color: isSelected
+                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          subtitle: Text(
+            prompt.headline, // Show headline instead of description
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: isSelected
+                  ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.7)
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: prompt.isFavorite
+              ? Icon(
+                  Bootstrap.star_fill,
+                  color: Theme.of(context).colorScheme.tertiary,
+                  size: 14,
+                )
+              : null,
+          onTap: () {
+            provider.selectPrompt(prompt);
+          },
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+      ),
+    );
+  }
+
+  void _showPromptContextMenu(BuildContext context, Offset position, PromptModel prompt, PromptProvider provider) {
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx + 1,
+        position.dy + 1,
+      ),
+      items: <PopupMenuEntry>[
+        PopupMenuItem(
+          child: Row(
+            children: [
+              const Icon(Bootstrap.pencil, size: 16),
+              const SizedBox(width: 8),
+              const Text('Rename'),
+            ],
+          ),
+          onTap: () => _showRenamePromptDialog(prompt, provider),
+        ),
+        PopupMenuItem(
+          child: Row(
+            children: [
+              const Icon(Bootstrap.copy, size: 16),
+              const SizedBox(width: 8),
+              const Text('Duplicate'),
+            ],
+          ),
+          onTap: () => provider.duplicatePrompt(prompt.id),
+        ),
+        PopupMenuItem(
+          child: Row(
+            children: [
+              Icon(
+                prompt.isFavorite ? Bootstrap.star : Bootstrap.star_fill,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(prompt.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'),
+            ],
+          ),
+          onTap: () => provider.togglePromptFavorite(prompt.id),
+        ),
+        PopupMenuItem(
+          child: Row(
+            children: [
+              const Icon(Bootstrap.arrow_right, size: 16),
+              const SizedBox(width: 8),
+              const Text('Move to Folder'),
+            ],
+          ),
+          onTap: () => _showMovePromptDialog(prompt, provider),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          child: Row(
+            children: [
+              Icon(
+                Bootstrap.trash,
+                size: 16,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Delete',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                ),
               ),
             ],
+          ),
+          onTap: () => _showDeletePromptDialog(prompt, provider),
         ),
-        body: Column(
-        children: [
-            Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-                decoration: InputDecoration(
-                hintText: 'Search prompts...',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: theme.colorScheme.background,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-            ),
-            ),
-            const Divider(height: 1),
-            if (provider.isLoading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
-            else
-            Expanded(
-                child: ListView.builder(
-                padding: const EdgeInsets.all(8),
-                itemCount: provider.folders.length,
-                itemBuilder: (context, index) {
-                    final folder = provider.folders[index];
-                    return _buildFolderTile(context, folder, 0);
-                },
-                ),
-            ),
-        ],
-        ),
+      ],
     );
   }
 
-  Widget _buildFolderTile(BuildContext context, PromptFolder folder, int depth) {
-    return GestureDetector(
-      onSecondaryTapDown: (details) => _showFolderContextMenu(context, details, folder),
-      child: ExpansionTile(
-        initiallyExpanded: true,
-        leading: Icon(Icons.folder_open, color: Colors.orange.shade300),
-        title: Text(folder.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        children: [
-          for (var subFolder in folder.subFolders)
-              Padding(
-                  padding: EdgeInsets.only(left: 16.0 * (depth + 1)),
-                  child: _buildFolderTile(context, subFolder, depth + 1),
+  void _showFolderContextMenu(BuildContext context, Offset position, PromptFolder folder, PromptProvider provider) {
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx + 1,
+        position.dy + 1,
+      ),
+      items: <PopupMenuEntry>[
+        PopupMenuItem(
+          child: Row(
+            children: [
+              const Icon(Bootstrap.pencil, size: 16),
+              const SizedBox(width: 8),
+              const Text('Rename'),
+            ],
+          ),
+          onTap: () => _showRenameFolderDialog(folder, provider),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          child: Row(
+            children: [
+              Icon(
+                Bootstrap.trash,
+                size: 16,
+                color: Theme.of(context).colorScheme.error,
               ),
-          for (var prompt in folder.prompts)
-              _buildPromptTile(context, prompt, depth + 1),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPromptTile(BuildContext context, Prompt prompt, int depth) {
-    final provider = context.read<PromptProvider>();
-    
-    // Extract first line of template as headline
-    String headline = prompt.template.split('\n').first.trim();
-    if (headline.length > 50) {
-      headline = '${headline.substring(0, 50)}...';
-    }
-    if (headline.isEmpty) {
-      headline = 'No content';
-    }
-    
-    return Padding(
-      padding: EdgeInsets.only(left: 16.0 * depth),
-      child: GestureDetector(
-        onSecondaryTapDown: (details) => _showPromptContextMenu(context, details, prompt),
-        child: ListTile(
-          leading: Icon(Bootstrap.lightning_charge, size: 18, color: Theme.of(context).colorScheme.secondary),
-          title: Text(prompt.name),
-          subtitle: Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis),
-          onTap: () {
-            provider.openPromptInTab(prompt);
-          },
-          dense: true,
-          visualDensity: VisualDensity.compact,
+              const SizedBox(width: 8),
+              Text(
+                'Delete',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
+          ),
+          onTap: () => _showDeleteFolderDialog(folder, provider),
         ),
-      ),
+      ],
     );
   }
 
-  void _showCreateFolderDialog(BuildContext context) {
-    final TextEditingController controller = TextEditingController();
+  // Dialog methods
+  void _showCreateFolderDialog() {
+    final nameController = TextEditingController();
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Create New Folder'),
         content: TextField(
-          controller: controller,
+          controller: nameController,
           decoration: const InputDecoration(
             labelText: 'Folder Name',
             hintText: 'Enter folder name',
@@ -138,80 +479,11 @@ class SidebarTreePanel extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                context.read<PromptProvider>().createNewFolder(controller.text.trim());
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCreatePromptDialog(BuildContext context) {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController descController = TextEditingController();
-    final provider = context.read<PromptProvider>();
-    String? selectedFolderId;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create New Prompt'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Prompt Name',
-                hintText: 'Enter prompt name',
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descController,
-              decoration: const InputDecoration(
-                labelText: 'Description (Optional)',
-                hintText: 'Enter description',
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Folder',
-                hintText: 'Select folder',
-              ),
-              items: provider.folders.map((folder) => DropdownMenuItem(
-                value: folder.id,
-                child: Text(folder.name),
-              )).toList(),
-              onChanged: (value) {
-                selectedFolderId = value;
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               if (nameController.text.trim().isNotEmpty) {
-                // Use first folder as default if no selection
-                final folderId = selectedFolderId ?? (provider.folders.isNotEmpty ? provider.folders.first.id : '');
-                provider.createNewPrompt(
-                  nameController.text.trim(),
-                  descController.text.trim(), // Can be empty now
-                  folderId,
+                context.read<PromptProvider>().createNewFolder(
+                  name: nameController.text.trim(),
                 );
                 Navigator.pop(context);
               }
@@ -223,75 +495,101 @@ class SidebarTreePanel extends StatelessWidget {
     );
   }
 
-  void _showFolderContextMenu(BuildContext context, TapDownDetails details, PromptFolder folder) {
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    
-    showMenu(
+  void _showCreatePromptDialog() {
+    final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
+    String? selectedFolderId;
+
+    showDialog(
       context: context,
-      position: RelativeRect.fromRect(
-        details.globalPosition & const Size(40, 40),
-        Offset.zero & overlay.size,
+      builder: (context) => Consumer<PromptProvider>(
+        builder: (context, provider, child) => AlertDialog(
+          title: const Text('Create New Prompt'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Prompt Name',
+                  hintText: 'Enter prompt name',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'Enter description',
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedFolderId,
+                decoration: const InputDecoration(
+                  labelText: 'Folder',
+                ),
+                items: provider.folders.map((folder) {
+                  return DropdownMenuItem(
+                    value: folder.id,
+                    child: Text(folder.name),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  selectedFolderId = value;
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (nameController.text.trim().isNotEmpty) {
+                  provider.createNewPrompt(
+                    name: nameController.text.trim(),
+                    description: descriptionController.text.trim(),
+                    folderId: selectedFolderId,
+                  );
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
       ),
-      items: [
-        PopupMenuItem(
-          value: 'rename',
-          child: const Row(
-            children: [
-              Icon(Icons.edit, size: 16),
-              SizedBox(width: 8),
-              Text('Rename'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          child: Row(
-            children: [
-              Icon(Icons.delete, size: 16, color: Colors.red.shade600),
-              const SizedBox(width: 8),
-              Text('Delete', style: TextStyle(color: Colors.red.shade600)),
-            ],
-          ),
-        ),
-      ],
-    ).then((value) {
-      if (value == 'rename') {
-        _showRenameFolderDialog(context, folder);
-      } else if (value == 'delete') {
-        _showDeleteFolderDialog(context, folder);
-      }
-    });
+    );
   }
 
-  void _showRenameFolderDialog(BuildContext context, PromptFolder folder) {
-    final TextEditingController controller = TextEditingController(text: folder.name);
+  void _showRenameFolderDialog(PromptFolder folder, PromptProvider provider) {
+    final nameController = TextEditingController(text: folder.name);
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Rename Folder'),
         content: TextField(
-          controller: controller,
+          controller: nameController,
           decoration: const InputDecoration(
             labelText: 'Folder Name',
-            hintText: 'Enter new folder name',
           ),
           autofocus: true,
-          onSubmitted: (value) {
-            if (value.trim().isNotEmpty) {
-              context.read<PromptProvider>().renameFolder(folder.id, value.trim());
-              Navigator.pop(context);
-            }
-          },
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                context.read<PromptProvider>().renameFolder(folder.id, controller.text.trim());
+              if (nameController.text.trim().isNotEmpty) {
+                provider.renameFolder(folder.id, nameController.text.trim());
                 Navigator.pop(context);
               }
             },
@@ -302,185 +600,60 @@ class SidebarTreePanel extends StatelessWidget {
     );
   }
 
-  void _showDeleteFolderDialog(BuildContext context, PromptFolder folder) {
+  void _showRenamePromptDialog(PromptModel prompt, PromptProvider provider) {
+    final nameController = TextEditingController(text: prompt.name);
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Folder'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Are you sure you want to delete "${folder.name}"?'),
-            const SizedBox(height: 8),
-            Text('This will permanently delete:'),
-            const SizedBox(height: 4),
-            Text('• ${folder.prompts.length} prompt(s)'),
-            Text('• ${folder.subFolders.length} subfolder(s)'),
-            const SizedBox(height: 8),
-            const Text(
-              'This action cannot be undone.',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
-            ),
-          ],
+        title: const Text('Rename Prompt'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'Prompt Name',
+          ),
+          autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
-            onPressed: () {
-              context.read<PromptProvider>().deleteFolder(folder.id);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Deleted folder "${folder.name}" successfully!')),
-              );
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPromptContextMenu(BuildContext context, TapDownDetails details, Prompt prompt) {
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    
-    showMenu(
-      context: context,
-      position: RelativeRect.fromRect(
-        details.globalPosition & const Size(40, 40),
-        Offset.zero & overlay.size,
-      ),
-      items: [
-        PopupMenuItem(
-          value: 'rename',
-          child: const Row(
-            children: [
-              Icon(Icons.edit, size: 16),
-              SizedBox(width: 8),
-              Text('Rename'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'duplicate',
-          child: const Row(
-            children: [
-              Icon(Icons.copy, size: 16),
-              SizedBox(width: 8),
-              Text('Duplicate'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'move',
-          child: const Row(
-            children: [
-              Icon(Icons.drive_file_move, size: 16),
-              SizedBox(width: 8),
-              Text('Move'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          child: Row(
-            children: [
-              Icon(Icons.delete, size: 16, color: Colors.red.shade600),
-              const SizedBox(width: 8),
-              Text('Delete', style: TextStyle(color: Colors.red.shade600)),
-            ],
-          ),
-        ),
-      ],
-    ).then((value) {
-      if (value == 'rename') {
-        _showEditPromptDialog(context, prompt);
-      } else if (value == 'duplicate') {
-        _showDuplicatePromptDialog(context, prompt);
-      } else if (value == 'move') {
-        _showMovePromptDialog(context, prompt);
-      } else if (value == 'delete') {
-        _showDeletePromptDialog(context, prompt);
-      }
-    });
-  }
-
-  void _showEditPromptDialog(BuildContext context, Prompt prompt) {
-    final TextEditingController nameController = TextEditingController(text: prompt.name);
-    final TextEditingController descController = TextEditingController(text: prompt.description);
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Prompt'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Prompt Name',
-                hintText: 'Enter prompt name',
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descController,
-              decoration: const InputDecoration(
-                labelText: 'Description (Optional)',
-                hintText: 'Enter description',
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               if (nameController.text.trim().isNotEmpty) {
-                context.read<PromptProvider>().updatePromptDetails(
-                  prompt.id, 
-                  nameController.text.trim(),
-                  descController.text.trim(),
-                );
+                final updatedPrompt = prompt.copyWith(name: nameController.text.trim());
+                provider.updatePrompt(updatedPrompt);
                 Navigator.pop(context);
               }
             },
-            child: const Text('Save'),
+            child: const Text('Rename'),
           ),
         ],
       ),
     );
   }
 
-  void _showDuplicatePromptDialog(BuildContext context, Prompt prompt) {
-    final TextEditingController controller = TextEditingController(text: '${prompt.name} (Copy)');
+  void _showMovePromptDialog(PromptModel prompt, PromptProvider provider) {
+    String? selectedFolderId = prompt.parentFolderId;
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Duplicate Prompt'),
-        content: TextField(
-          controller: controller,
+        title: const Text('Move Prompt'),
+        content: DropdownButtonFormField<String>(
+          value: selectedFolderId,
           decoration: const InputDecoration(
-            labelText: 'New Prompt Name',
-            hintText: 'Enter name for duplicated prompt',
+            labelText: 'Move to Folder',
           ),
-          autofocus: true,
-          onSubmitted: (value) {
-            if (value.trim().isNotEmpty) {
-              context.read<PromptProvider>().duplicatePrompt(prompt.id, value.trim());
-              Navigator.pop(context);
-            }
+          items: provider.folders.map((folder) {
+            return DropdownMenuItem(
+              value: folder.id,
+              child: Text(folder.name),
+            );
+          }).toList(),
+          onChanged: (value) {
+            selectedFolderId = value;
           },
         ),
         actions: [
@@ -488,62 +661,11 @@ class SidebarTreePanel extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                context.read<PromptProvider>().duplicatePrompt(prompt.id, controller.text.trim());
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Duplicate'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showMovePromptDialog(BuildContext context, Prompt prompt) {
-    final provider = context.read<PromptProvider>();
-    final folders = provider.getAllFolders();
-    String? selectedFolderId;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Move Prompt'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Move "${prompt.name}" to:'),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Target Folder',
-                hintText: 'Select folder',
-              ),
-              items: folders.map((folder) => DropdownMenuItem(
-                value: folder.id,
-                child: Text(folder.name),
-              )).toList(),
-              onChanged: (value) {
-                selectedFolderId = value;
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               if (selectedFolderId != null) {
                 provider.movePrompt(prompt.id, selectedFolderId!);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Moved "${prompt.name}" successfully!')),
-                );
               }
             },
             child: const Text('Move'),
@@ -553,26 +675,68 @@ class SidebarTreePanel extends StatelessWidget {
     );
   }
 
-  void _showDeletePromptDialog(BuildContext context, Prompt prompt) {
+  void _showDeletePromptDialog(PromptModel prompt, PromptProvider provider) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Prompt'),
-        content: Text('Are you sure you want to delete "${prompt.name}"?\n\nThis action cannot be undone.'),
+        content: Text('Are you sure you want to delete "${prompt.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
-              context.read<PromptProvider>().deletePrompt(prompt.id);
+              provider.deletePrompt(prompt.id);
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Deleted "${prompt.name}" successfully!')),
-              );
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteFolderDialog(PromptFolder folder, PromptProvider provider) {
+    final promptCount = provider.getPromptsInFolder(folder.id).length;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Folder'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete "${folder.name}"?'),
+            if (promptCount > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                '$promptCount prompt(s) will be moved to the General folder.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              provider.deleteFolder(folder.id);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('Delete'),
           ),
         ],

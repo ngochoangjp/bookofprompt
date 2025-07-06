@@ -1,327 +1,279 @@
-import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
-class Prompt {
+class PromptModel {
   final String id;
   final String name;
   final String description;
-  String template; // Can be modified
-  final DateTime createdAt;
-  final DateTime? lastModified;
+  final String template;
+  final String category;
   final List<String> tags;
-  final IconData? icon;
-  final Color? color;
+  final Map<String, String> variables;
+  final DateTime createdAt;
+  final DateTime updatedAt;
   final bool isFavorite;
-  final int usageCount;
+  final String? parentFolderId;
 
-  Prompt({
-    required this.id,
+  PromptModel({
+    String? id,
     required this.name,
     required this.description,
     required this.template,
+    this.category = 'General',
+    this.tags = const [],
+    this.variables = const {},
     DateTime? createdAt,
-    this.lastModified,
-    List<String>? tags,
-    this.icon,
-    this.color,
+    DateTime? updatedAt,
     this.isFavorite = false,
-    this.usageCount = 0,
-  }) : createdAt = createdAt ?? DateTime.now(),
-       tags = tags ?? [];
+    this.parentFolderId,
+  })  : id = id ?? const Uuid().v4(),
+        createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
-  // Copy with method for easy updates
-  Prompt copyWith({
+  // Get headline from template (first line)
+  String get headline {
+    final lines = template.split('\n');
+    if (lines.isNotEmpty) {
+      final firstLine = lines.first.trim();
+      if (firstLine.length > 50) {
+        return '${firstLine.substring(0, 50)}...';
+      }
+      return firstLine.isNotEmpty ? firstLine : 'No content';
+    }
+    return 'No content';
+  }
+
+  // Extract template variables
+  List<String> get templateVariables {
+    final regex = RegExp(r'\{\{([^}]+)\}\}');
+    final matches = regex.allMatches(template);
+    return matches.map((match) => match.group(1)!.trim()).toSet().toList();
+  }
+
+  // Generate final prompt by replacing variables
+  String generatePrompt(Map<String, String> variableValues) {
+    String result = template;
+    for (final entry in variableValues.entries) {
+      result = result.replaceAll('{{${entry.key}}}', entry.value);
+    }
+    return result;
+  }
+
+  // Copy with method
+  PromptModel copyWith({
+    String? id,
     String? name,
     String? description,
     String? template,
-    DateTime? lastModified,
+    String? category,
     List<String>? tags,
-    IconData? icon,
-    Color? color,
+    Map<String, String>? variables,
+    DateTime? createdAt,
+    DateTime? updatedAt,
     bool? isFavorite,
-    int? usageCount,
+    String? parentFolderId,
   }) {
-    return Prompt(
-      id: id,
+    return PromptModel(
+      id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
       template: template ?? this.template,
-      createdAt: createdAt,
-      lastModified: lastModified ?? DateTime.now(),
+      category: category ?? this.category,
       tags: tags ?? this.tags,
-      icon: icon ?? this.icon,
-      color: color ?? this.color,
+      variables: variables ?? this.variables,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
       isFavorite: isFavorite ?? this.isFavorite,
-      usageCount: usageCount ?? this.usageCount,
+      parentFolderId: parentFolderId ?? this.parentFolderId,
     );
   }
 
-  // Helper method to get display color
-  Color getDisplayColor(BuildContext context) {
-    if (color != null) return color!;
-    
-    // Return theme-appropriate default colors
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    // Use different colors based on usage or category
-    if (isFavorite) return colorScheme.tertiary;
-    if (usageCount > 10) return colorScheme.primary;
-    if (usageCount > 5) return colorScheme.secondary;
-    return colorScheme.surfaceVariant;
+  // Convert to map for storage
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'template': template,
+      'category': category,
+      'tags': tags.join(','),
+      'variables': variables.entries.map((e) => '${e.key}:${e.value}').join('|'),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'isFavorite': isFavorite ? 1 : 0,
+      'parentFolderId': parentFolderId,
+    };
   }
 
-  // Helper method to get display icon
-  IconData getDisplayIcon() {
-    if (icon != null) return icon!;
+  // Create from map
+  factory PromptModel.fromMap(Map<String, dynamic> map) {
+    final tagsString = map['tags'] as String? ?? '';
+    final tags = tagsString.isEmpty ? <String>[] : tagsString.split(',');
     
-    // Return contextual icons based on content
-    if (isFavorite) return Icons.star_rounded;
-    if (template.toLowerCase().contains('email')) return Icons.email_rounded;
-    if (template.toLowerCase().contains('code')) return Icons.code_rounded;
-    if (template.toLowerCase().contains('write')) return Icons.edit_rounded;
-    if (template.toLowerCase().contains('analyze')) return Icons.analytics_rounded;
-    if (template.toLowerCase().contains('summarize')) return Icons.summarize_rounded;
-    return Icons.description_rounded;
-  }
+    final variablesString = map['variables'] as String? ?? '';
+    final variables = <String, String>{};
+    if (variablesString.isNotEmpty) {
+      final pairs = variablesString.split('|');
+      for (final pair in pairs) {
+        final parts = pair.split(':');
+        if (parts.length == 2) {
+          variables[parts[0]] = parts[1];
+        }
+      }
+    }
 
-  // Helper method to check if prompt matches search query
-  bool matchesSearch(String query) {
-    final lowerQuery = query.toLowerCase();
-    return name.toLowerCase().contains(lowerQuery) ||
-           description.toLowerCase().contains(lowerQuery) ||
-           template.toLowerCase().contains(lowerQuery) ||
-           tags.any((tag) => tag.toLowerCase().contains(lowerQuery));
+    return PromptModel(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      description: map['description'] as String? ?? '',
+      template: map['template'] as String? ?? '',
+      category: map['category'] as String? ?? 'General',
+      tags: tags,
+      variables: variables,
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: DateTime.parse(map['updatedAt'] as String),
+      isFavorite: (map['isFavorite'] as int? ?? 0) == 1,
+      parentFolderId: map['parentFolderId'] as String?,
+    );
   }
 }
 
 class PromptFolder {
   final String id;
   final String name;
-  final String? description;
-  final List<Prompt> prompts;
-  final List<PromptFolder> subFolders;
+  final String? parentId;
   final DateTime createdAt;
-  final DateTime? lastModified;
-  final IconData? icon;
-  final Color? color;
+  final DateTime updatedAt;
   final bool isExpanded;
-  final int sortOrder;
+  final List<PromptModel> prompts;
 
   PromptFolder({
-    required this.id,
+    String? id,
     required this.name,
-    this.description,
-    List<Prompt>? prompts,
-    List<PromptFolder>? subFolders,
+    this.parentId,
     DateTime? createdAt,
-    this.lastModified,
-    this.icon,
-    this.color,
-    this.isExpanded = false,
-    this.sortOrder = 0,
-  }) : prompts = prompts ?? [],
-       subFolders = subFolders ?? [],
-       createdAt = createdAt ?? DateTime.now();
+    DateTime? updatedAt,
+    this.isExpanded = true,
+    this.prompts = const [],
+  })  : id = id ?? const Uuid().v4(),
+        createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
-  // Copy with method for easy updates
+  // Copy with method
   PromptFolder copyWith({
+    String? id,
     String? name,
-    String? description,
-    List<Prompt>? prompts,
-    List<PromptFolder>? subFolders,
-    DateTime? lastModified,
-    IconData? icon,
-    Color? color,
+    String? parentId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
     bool? isExpanded,
-    int? sortOrder,
+    List<PromptModel>? prompts,
   }) {
     return PromptFolder(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
-      description: description ?? this.description,
-      prompts: prompts ?? this.prompts,
-      subFolders: subFolders ?? this.subFolders,
-      createdAt: createdAt,
-      lastModified: lastModified ?? DateTime.now(),
-      icon: icon ?? this.icon,
-      color: color ?? this.color,
+      parentId: parentId ?? this.parentId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? DateTime.now(),
       isExpanded: isExpanded ?? this.isExpanded,
-      sortOrder: sortOrder ?? this.sortOrder,
+      prompts: prompts ?? this.prompts,
     );
   }
 
-  // Helper method to get total prompt count including subfolders
-  int get totalPromptCount {
-    int count = prompts.length;
-    for (var folder in subFolders) {
-      count += folder.totalPromptCount;
-    }
-    return count;
+  // Convert to map for storage
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'parentId': parentId,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'isExpanded': isExpanded ? 1 : 0,
+    };
   }
 
-  // Helper method to get display color
-  Color getDisplayColor(BuildContext context) {
-    if (color != null) return color!;
-    
-    // Return theme-appropriate default colors
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    // Use different colors based on content
-    if (totalPromptCount > 20) return colorScheme.primary;
-    if (totalPromptCount > 10) return colorScheme.secondary;
-    if (totalPromptCount > 5) return colorScheme.tertiary;
-    return colorScheme.surfaceVariant;
-  }
-
-  // Helper method to get display icon
-  IconData getDisplayIcon() {
-    if (icon != null) return icon!;
-    
-    // Return contextual icons based on name or content
-    final lowerName = name.toLowerCase();
-    if (lowerName.contains('work') || lowerName.contains('business')) {
-      return Icons.work_rounded;
-    }
-    if (lowerName.contains('personal') || lowerName.contains('private')) {
-      return Icons.person_rounded;
-    }
-    if (lowerName.contains('creative') || lowerName.contains('writing')) {
-      return Icons.create_rounded;
-    }
-    if (lowerName.contains('code') || lowerName.contains('technical')) {
-      return Icons.code_rounded;
-    }
-    if (lowerName.contains('email') || lowerName.contains('communication')) {
-      return Icons.email_rounded;
-    }
-    if (lowerName.contains('social') || lowerName.contains('media')) {
-      return Icons.share_rounded;
-    }
-    return isExpanded ? Icons.folder_open_rounded : Icons.folder_rounded;
-  }
-
-  // Helper method to search within folder and subfolders
-  List<Prompt> searchPrompts(String query) {
-    List<Prompt> results = [];
-    
-    // Search in this folder's prompts
-    results.addAll(prompts.where((prompt) => prompt.matchesSearch(query)));
-    
-    // Search in subfolders
-    for (var folder in subFolders) {
-      results.addAll(folder.searchPrompts(query));
-    }
-    
-    return results;
-  }
-
-  // Helper method to check if folder matches search query
-  bool matchesSearch(String query) {
-    final lowerQuery = query.toLowerCase();
-    return name.toLowerCase().contains(lowerQuery) ||
-           (description?.toLowerCase().contains(lowerQuery) ?? false) ||
-           searchPrompts(query).isNotEmpty;
+  // Create from map
+  factory PromptFolder.fromMap(Map<String, dynamic> map) {
+    return PromptFolder(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      parentId: map['parentId'] as String?,
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: DateTime.parse(map['updatedAt'] as String),
+      isExpanded: (map['isExpanded'] as int? ?? 1) == 1,
+    );
   }
 }
 
-class GeneratedPromptHistory {
+class GeneratedPrompt {
   final String id;
-  final String sourcePromptId;
-  final String generatedText;
-  final DateTime timestamp;
-  final String? title;
-  final List<String> tags;
+  final String promptId;
+  final String content;
+  final Map<String, String> variables;
+  final DateTime createdAt;
   final bool isFavorite;
-  final double? rating;
-  final String? notes;
-  final Map<String, String> metadata;
 
-  GeneratedPromptHistory({
-    required this.id,
-    required this.sourcePromptId,
-    required this.generatedText,
-    required this.timestamp,
-    this.title,
-    List<String>? tags,
+  GeneratedPrompt({
+    String? id,
+    required this.promptId,
+    required this.content,
+    required this.variables,
+    DateTime? createdAt,
     this.isFavorite = false,
-    this.rating,
-    this.notes,
-    Map<String, String>? metadata,
-  }) : tags = tags ?? [],
-       metadata = metadata ?? {};
+  })  : id = id ?? const Uuid().v4(),
+        createdAt = createdAt ?? DateTime.now();
 
-  // Copy with method for easy updates
-  GeneratedPromptHistory copyWith({
-    String? title,
-    List<String>? tags,
+  // Copy with method
+  GeneratedPrompt copyWith({
+    String? id,
+    String? promptId,
+    String? content,
+    Map<String, String>? variables,
+    DateTime? createdAt,
     bool? isFavorite,
-    double? rating,
-    String? notes,
-    Map<String, String>? metadata,
   }) {
-    return GeneratedPromptHistory(
-      id: id,
-      sourcePromptId: sourcePromptId,
-      generatedText: generatedText,
-      timestamp: timestamp,
-      title: title ?? this.title,
-      tags: tags ?? this.tags,
+    return GeneratedPrompt(
+      id: id ?? this.id,
+      promptId: promptId ?? this.promptId,
+      content: content ?? this.content,
+      variables: variables ?? this.variables,
+      createdAt: createdAt ?? this.createdAt,
       isFavorite: isFavorite ?? this.isFavorite,
-      rating: rating ?? this.rating,
-      notes: notes ?? this.notes,
-      metadata: metadata ?? this.metadata,
     );
   }
 
-  // Helper method to get display title
-  String getDisplayTitle() {
-    if (title != null && title!.isNotEmpty) {
-      return title!;
+  // Convert to map for storage
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'promptId': promptId,
+      'content': content,
+      'variables': variables.entries.map((e) => '${e.key}:${e.value}').join('|'),
+      'createdAt': createdAt.toIso8601String(),
+      'isFavorite': isFavorite ? 1 : 0,
+    };
+  }
+
+  // Create from map
+  factory GeneratedPrompt.fromMap(Map<String, dynamic> map) {
+    final variablesString = map['variables'] as String? ?? '';
+    final variables = <String, String>{};
+    if (variablesString.isNotEmpty) {
+      final pairs = variablesString.split('|');
+      for (final pair in pairs) {
+        final parts = pair.split(':');
+        if (parts.length == 2) {
+          variables[parts[0]] = parts[1];
+        }
+      }
     }
-    
-    // Generate title from first few words of generated text
-    final words = generatedText.split(' ');
-    if (words.length > 5) {
-      return '${words.take(5).join(' ')}...';
-    }
-    return generatedText;
-  }
 
-  // Helper method to get formatted timestamp
-  String getFormattedTimestamp() {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-    
-    if (difference.inDays > 7) {
-      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
-  }
-
-  // Helper method to check if history matches search query
-  bool matchesSearch(String query) {
-    final lowerQuery = query.toLowerCase();
-    return (title?.toLowerCase().contains(lowerQuery) ?? false) ||
-           generatedText.toLowerCase().contains(lowerQuery) ||
-           tags.any((tag) => tag.toLowerCase().contains(lowerQuery)) ||
-           (notes?.toLowerCase().contains(lowerQuery) ?? false);
-  }
-
-  // Helper method to get word count
-  int get wordCount {
-    return generatedText.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
-  }
-
-  // Helper method to get character count
-  int get characterCount {
-    return generatedText.length;
+    return GeneratedPrompt(
+      id: map['id'] as String,
+      promptId: map['promptId'] as String,
+      content: map['content'] as String,
+      variables: variables,
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      isFavorite: (map['isFavorite'] as int? ?? 0) == 1,
+    );
   }
 }

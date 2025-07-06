@@ -1,37 +1,67 @@
 name: prompt_manager
-description: "A professional application to manage, create, and use AI prompts efficiently."
-publish_to: 'none' 
-version: 1.0.0+1
+description: Advanced Prompt Manager - Organize, create, and manage AI prompts efficiently
+publish_to: 'none'
+version: 1.0.2+1
 
 environment:
-  sdk: '>=3.2.3 <4.0.0'
+  sdk: '>=3.1.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
   
-  # State Management (as per document)
+  # State Management
   provider: ^6.1.1
-
-  # UI & Components (as per document)
-  cupertino_icons: ^1.0.2
-  flutter_code_editor: ^0.3.0 # For template editing
-  icons_plus: ^5.0.0 # For rich icon library
-
-  # Utilities
-  google_fonts: ^6.1.0 # For Inter/Roboto/Fira Code fonts
-  path_provider: ^2.1.2 # To find local paths for database
-  sqflite: ^2.3.2 # For local database
+  
+  # Database & Storage
+  sqflite: ^2.3.0
   path: ^1.8.3
-  flutter_highlight: ^0.7.0 # Syntax highlighting for code editor
-  highlight: ^0.7.0 
-  uuid: ^4.3.3
+  shared_preferences: ^2.2.2
+  flutter_secure_storage: ^9.0.0
+  
+  # UI & Icons
+  cupertino_icons: ^1.0.6
+  icons_plus: ^5.0.0
+  google_fonts: ^6.1.0
+  
+  # Text Editor & Code Highlighting
+  flutter_code_editor: ^0.3.0
+  
+  # File Operations
+  file_picker: ^6.1.1
+  path_provider: ^2.1.1
+  
+  # Utils
+  uuid: ^4.2.1
   intl: ^0.19.0
+  url_launcher: ^6.2.1
+  
+  # JSON & Serialization
+  json_annotation: ^4.8.1
+  
+  # Drag & Drop
+  reorderables: ^0.6.0
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+  msix: ^2.8.18
 
 flutter:
-  uses-material-design: true 
+  uses-material-design: true
+  assets:
+    - assets/
+    - assets/icons/
+    - assets/images/
+
+msix:
+  display_name: Prompt Manager
+  publisher_display_name: Prompt Manager Team
+  identity_name: PromptManager
+  msix_version: 1.0.2.0
+  description: Advanced Prompt Manager for AI workflows
+  execution_alias: promptmanager
+  logo_path: assets/icons/app_icon.png 

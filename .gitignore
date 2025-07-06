@@ -43,7 +43,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# iOS related
+# iOS/macOS
 **/ios/**/*.mode1v3
 **/ios/**/*.mode2v3
 **/ios/**/*.moved-aside
@@ -74,52 +74,46 @@ app.*.map.json
 
 # macOS
 **/macos/Flutter/GeneratedPluginRegistrant.swift
+**/macos/Flutter/ephemeral/
 
 # Coverage
 coverage/
 
 # Exceptions to above rules.
-!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+!**/ios/**/default.mode1v3
+!**/ios/**/default.mode2v3
+!**/ios/**/default.pbxuser
+!**/ios/**/default.perspectivev3
 
-# Web related
-lib/generated_plugin_registrant.dart
+# Web
+/web/
 
-# Windows related
-**/windows/flutter/generated_plugin_registrant.cc
-**/windows/flutter/generated_plugin_registrant.h
-**/windows/flutter/generated_plugins.cmake
+# Windows
+**/windows/flutter/ephemeral/
 
-# Linux related
-**/linux/flutter/generated_plugin_registrant.cc
-**/linux/flutter/generated_plugin_registrant.h
-**/linux/flutter/generated_plugins.cmake
+# Linux
+**/linux/flutter/ephemeral/
 
-# Firebase related
-**/ios/Runner/GoogleService-Info.plist
-**/android/app/google-services.json
-**/lib/firebase_options.dart
-
-# Environment variables
-.env
-.env.local
-.env.development
-.env.test
-.env.production
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
+# Release builds and installers
+**/Release/
+**/Debug/
+Prompt_Manager_Release/
+Installer/
+*.exe
+*.msi
+*.dmg
+*.app
+*.apk
+*.aab
+*.ipa
+*.tar.gz
+*.zip
 
 # Logs
-logs/
+Log/
 *.log
 
-# Temporary files
-tmp/
-temp/
-
-# Editor directories and files
+# IDE and Editor files
 .vscode/
 .idea/
 *.swp
@@ -134,3 +128,41 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Project specific
+create_installer.iss
+fix_windows_scaling.ps1
+
+# Flutter Version Manager
+.fvm/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# Generated files
+*.g.dart
+*.freezed.dart
+*.gr.dart
+*.config.dart
+*.pbxproj.bak
+
+# Package files
+*.deb
+*.rpm
+
+# Analysis
+analysis_options.yaml.bak 
