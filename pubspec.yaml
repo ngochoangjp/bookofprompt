@@ -51,10 +51,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/
-    - assets/icons/
-    - assets/images/
+  # assets:
+  #   - assets/
+  #   - assets/icons/
+  #   - assets/images/
 
 msix:
   display_name: Prompt Manager

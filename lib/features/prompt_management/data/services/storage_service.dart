@@ -20,15 +20,22 @@ class StorageService {
   }
 
   static Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _dbName);
+    try {
+      final dbPath = await getDatabasesPath();
+      final path = join(dbPath, _dbName);
+      
+      print('Database path: $path');
 
-    return await openDatabase(
-      path,
-      version: _dbVersion,
-      onCreate: _createTables,
-      onUpgrade: _onUpgrade,
-    );
+      return await openDatabase(
+        path,
+        version: _dbVersion,
+        onCreate: _createTables,
+        onUpgrade: _onUpgrade,
+      );
+    } catch (e) {
+      print('Error initializing database: $e');
+      rethrow;
+    }
   }
 
   static Future<void> _createTables(Database db, int version) async {
@@ -153,6 +160,19 @@ class StorageService {
     }
   }
 
+  // Test database connection
+  static Future<bool> testConnection() async {
+    try {
+      final db = await database;
+      final result = await db.rawQuery('SELECT 1');
+      print('Database test successful: $result');
+      return true;
+    } catch (e) {
+      print('Database test failed: $e');
+      return false;
+    }
+  }
+
   // CRUD operations for Prompts
   static Future<List<PromptModel>> getAllPrompts() async {
     final db = await database;
@@ -203,23 +223,31 @@ class StorageService {
   }
 
   static Future<int> insertPrompt(PromptModel prompt) async {
-    final db = await database;
-    return await db.insert(
-      _promptsTable,
-      {
-        'id': prompt.id,
-        'name': prompt.name,
-        'description': prompt.description,
-        'template': prompt.template,
-        'category': prompt.category,
-        'tags': jsonEncode(prompt.tags),
-        'variables': jsonEncode(prompt.variables),
-        'created_at': prompt.createdAt.toIso8601String(),
-        'updated_at': prompt.updatedAt.toIso8601String(),
-        'is_favorite': prompt.isFavorite ? 1 : 0,
-        'parent_folder_id': prompt.parentFolderId,
-      },
-    );
+    try {
+      print('Attempting to insert prompt: ${prompt.name} with ID: ${prompt.id}');
+      final db = await database;
+      final result = await db.insert(
+        _promptsTable,
+        {
+          'id': prompt.id,
+          'name': prompt.name,
+          'description': prompt.description,
+          'template': prompt.template,
+          'category': prompt.category,
+          'tags': jsonEncode(prompt.tags),
+          'variables': jsonEncode(prompt.variables),
+          'created_at': prompt.createdAt.toIso8601String(),
+          'updated_at': prompt.updatedAt.toIso8601String(),
+          'is_favorite': prompt.isFavorite ? 1 : 0,
+          'parent_folder_id': prompt.parentFolderId,
+        },
+      );
+      print('Successfully inserted prompt with result: $result');
+      return result;
+    } catch (e) {
+      print('Error inserting prompt: $e');
+      rethrow;
+    }
   }
 
   static Future<int> updatePrompt(PromptModel prompt) async {
@@ -276,18 +304,26 @@ class StorageService {
   }
 
   static Future<int> insertFolder(PromptFolder folder) async {
-    final db = await database;
-    return await db.insert(
-      _foldersTable,
-      {
-        'id': folder.id,
-        'name': folder.name,
-        'parent_id': folder.parentId,
-        'created_at': folder.createdAt.toIso8601String(),
-        'updated_at': folder.updatedAt.toIso8601String(),
-        'is_expanded': folder.isExpanded ? 1 : 0,
-      },
-    );
+    try {
+      print('Attempting to insert folder: ${folder.name} with ID: ${folder.id}');
+      final db = await database;
+      final result = await db.insert(
+        _foldersTable,
+        {
+          'id': folder.id,
+          'name': folder.name,
+          'parent_id': folder.parentId,
+          'created_at': folder.createdAt.toIso8601String(),
+          'updated_at': folder.updatedAt.toIso8601String(),
+          'is_expanded': folder.isExpanded ? 1 : 0,
+        },
+      );
+      print('Successfully inserted folder with result: $result');
+      return result;
+    } catch (e) {
+      print('Error inserting folder: $e');
+      rethrow;
+    }
   }
 
   static Future<int> updateFolder(PromptFolder folder) async {

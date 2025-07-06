@@ -107,13 +107,22 @@ class PromptProvider extends ChangeNotifier {
     required String name,
     String? parentId,
   }) async {
-    final folder = PromptFolder(
-      name: name,
-      parentId: parentId,
-    );
-    
-    await StorageService.insertFolder(folder);
-    await _loadData();
+    try {
+      print('Creating new folder: $name with parent ID: $parentId');
+      final folder = PromptFolder(
+        name: name,
+        parentId: parentId,
+      );
+      
+      print('Folder created: ${folder.id}');
+      await StorageService.insertFolder(folder);
+      print('Folder inserted successfully');
+      await _loadData();
+      print('Data reloaded after folder creation');
+    } catch (e) {
+      print('Error creating folder: $e');
+      rethrow;
+    }
   }
 
   Future<void> renameFolder(String folderId, String newName) async {
@@ -143,15 +152,24 @@ class PromptProvider extends ChangeNotifier {
     String template = '',
     String? folderId,
   }) async {
-    final prompt = PromptModel(
-      name: name,
-      description: description,
-      template: template,
-      parentFolderId: folderId ?? 'general',
-    );
-    
-    await StorageService.insertPrompt(prompt);
-    await _loadData();
+    try {
+      print('Creating new prompt: $name in folder: ${folderId ?? 'general'}');
+      final prompt = PromptModel(
+        name: name,
+        description: description,
+        template: template,
+        parentFolderId: folderId ?? 'general',
+      );
+      
+      print('Prompt created: ${prompt.id}');
+      await StorageService.insertPrompt(prompt);
+      print('Prompt inserted successfully');
+      await _loadData();
+      print('Data reloaded after prompt creation');
+    } catch (e) {
+      print('Error creating prompt: $e');
+      rethrow;
+    }
   }
 
   Future<void> updatePrompt(PromptModel prompt) async {
