@@ -62,7 +62,7 @@ class _PromptManagerScreenState extends State<PromptManagerScreen> with TickerPr
           ),
           const SizedBox(width: 12),
           Text(
-            'Prompt Manager',
+            'TremoPrompt',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -182,7 +182,7 @@ class _PromptManagerScreenState extends State<PromptManagerScreen> with TickerPr
               children: [
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
-                Text('Loading Prompt Manager...'),
+                Text('Loading TremoPrompt...'),
               ],
             ),
           );
