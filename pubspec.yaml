@@ -40,6 +40,7 @@ dependencies:
   
   # Drag & Drop
   reorderables: ^0.6.0
+  sqflite_common_ffi: ^2.3.6
   
 dev_dependencies:
   flutter_test:

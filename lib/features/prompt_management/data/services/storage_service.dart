@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/prompt_model.dart';
+import 'package:path_provider/path_provider.dart'; // Added for getApplicationDocumentsDirectory
+import 'dart:io'; // Added for File
 
 class StorageService {
   static Database? _database;
@@ -24,16 +26,49 @@ class StorageService {
       final dbPath = await getDatabasesPath();
       final path = join(dbPath, _dbName);
       
+      print('===== DATABASE DEBUG =====');
       print('Database path: $path');
+      print('Database name: $_dbName');
+      print('==========================');
 
-      return await openDatabase(
+      // Test write permissions
+      try {
+        final testFile = File('${dbPath}/test_write.txt');
+        await testFile.writeAsString('test');
+        await testFile.delete();
+        print('Write permissions: OK');
+      } catch (e) {
+        print('Write permissions: FAILED - $e');
+        // Fallback to app directory
+        final appDir = await getApplicationDocumentsDirectory();
+        final fallbackPath = join(appDir.path, _dbName);
+        print('Using fallback path: $fallbackPath');
+        
+        return await openDatabase(
+          fallbackPath,
+          version: _dbVersion,
+          onCreate: _createTables,
+          onUpgrade: _onUpgrade,
+        );
+      }
+
+      final db = await openDatabase(
         path,
         version: _dbVersion,
         onCreate: _createTables,
         onUpgrade: _onUpgrade,
       );
+      
+      print('Database opened successfully');
+      
+      // Test database with simple query
+      final testResult = await db.rawQuery('SELECT name FROM sqlite_master WHERE type="table"');
+      print('Database tables: $testResult');
+      
+      return db;
     } catch (e) {
-      print('Error initializing database: $e');
+      print('CRITICAL ERROR in _initDatabase: $e');
+      print('Stack trace: ${StackTrace.current}');
       rethrow;
     }
   }
