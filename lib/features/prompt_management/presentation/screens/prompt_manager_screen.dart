@@ -611,8 +611,7 @@ class SettingsDialog extends StatefulWidget {
 class _SettingsDialogState extends State<SettingsDialog> {
   String _currentStorageMode = 'system';
   String _currentDatabasePath = '';
-  bool _isPortableAvailable = false;
-  bool _isVirtualizedEnvironment = false;
+  String _customDatabasePath = '';
 
   @override
   void initState() {
@@ -623,36 +622,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
   Future<void> _loadSettings() async {
     final mode = await StorageService.getStorageMode();
     final path = await StorageService.getCurrentDatabasePath();
-    final portable = await StorageService.isPortableModeAvailable();
-    final virtualized = await _checkVirtualizedEnvironment();
+    final customPath = await StorageService.getCustomDatabasePath() ?? '';
     
     setState(() {
       _currentStorageMode = mode;
       _currentDatabasePath = path;
-      _isPortableAvailable = portable;
-      _isVirtualizedEnvironment = virtualized;
+      _customDatabasePath = customPath;
     });
   }
 
-  Future<bool> _checkVirtualizedEnvironment() async {
-    try {
-      final executablePath = Platform.resolvedExecutable;
-      final executableDir = File(executablePath).parent.path;
-      
-      // Check signs of virtualized environment
-      if (executableDir.contains('Temp') || 
-          executableDir.contains('TEMP') ||
-          executableDir.contains('EnigmaVB') ||
-          executableDir.contains('_virtual_') ||
-          executableDir.length > 200) {
-        return true;
-      }
-      
-      return false;
-    } catch (e) {
-      return false;
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -660,59 +639,17 @@ class _SettingsDialogState extends State<SettingsDialog> {
       title: const Text('Settings'),
       content: SizedBox(
         width: 500,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        height: 600,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Text(
               'Data Storage Location',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
-            
-            // Virtualized Environment Warning
-            if (_isVirtualizedEnvironment)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  border: Border.all(color: Colors.orange.shade400),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Bootstrap.exclamation_triangle,
-                      color: Colors.orange.shade700,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Virtualized Environment Detected',
-                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: Colors.orange.shade800,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'App appears to be running from Enigma Virtual Box or similar. '
-                            'Portable mode may not work correctly. System folder is recommended.',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.orange.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             
             // System Storage Option
             RadioListTile<String>(
@@ -731,26 +668,86 @@ class _SettingsDialogState extends State<SettingsDialog> {
             
             const SizedBox(height: 8),
             
-            // Portable Storage Option
+            // Custom Storage Option
             RadioListTile<String>(
-              title: const Text('Portable Mode'),
-              subtitle: Text(
-                _isPortableAvailable
-                    ? (_isVirtualizedEnvironment 
-                        ? 'Uses application folder\n• May not work in virtualized environment\n• Will fallback to Documents folder\n• System folder recommended instead'
-                        : 'Uses application folder\n• Good for USB drives\n• Easy manual backup\n• Data moves with app')
-                    : 'Not available (no write permission)',
+              title: const Text('Custom Folder'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Choose your own folder location\n• Sync with cloud storage (Dropbox, OneDrive)\n• Easy manual backup to USB drives\n• Data moves with chosen location'),
+                  if (_customDatabasePath.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Bootstrap.folder,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            _customDatabasePath,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
-              value: 'portable',
+              value: 'custom',
               groupValue: _currentStorageMode,
-              onChanged: _isPortableAvailable ? (value) {
+              onChanged: (value) async {
                 if (value != null) {
-                  setState(() {
-                    _currentStorageMode = value;
-                  });
+                  if (_customDatabasePath.isEmpty) {
+                    // Need to select folder first
+                    await _selectCustomFolder();
+                  } else {
+                    setState(() {
+                      _currentStorageMode = value;
+                    });
+                  }
                 }
-              } : null,
+              },
             ),
+            
+            // Custom folder selection button
+            if (_currentStorageMode == 'custom' || _customDatabasePath.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, top: 8),
+                child: Row(
+                  children: [
+                                         TextButton.icon(
+                       onPressed: _selectCustomFolder,
+                       icon: const Icon(Bootstrap.folder2_open, size: 16),
+                       label: Text(_customDatabasePath.isEmpty ? 'Select Folder' : 'Change Folder'),
+                     ),
+                     if (_customDatabasePath.isNotEmpty)
+                       TextButton.icon(
+                         onPressed: () async {
+                           setState(() {
+                             _customDatabasePath = '';
+                             if (_currentStorageMode == 'custom') {
+                               _currentStorageMode = 'system';
+                             }
+                           });
+                           await StorageService.setCustomDatabasePath('');
+                         },
+                         icon: const Icon(Bootstrap.x_circle_fill, size: 16),
+                         label: const Text('Clear'),
+                         style: TextButton.styleFrom(
+                           foregroundColor: Theme.of(context).colorScheme.error,
+                         ),
+                       ),
+                  ],
+                ),
+              ),
+
             
             const SizedBox(height: 16),
             
@@ -775,6 +772,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             ),
           ],
         ),
+        ),
       ),
       actions: [
         TextButton(
@@ -787,6 +785,35 @@ class _SettingsDialogState extends State<SettingsDialog> {
         ),
       ],
     );
+  }
+
+  Future<void> _selectCustomFolder() async {
+    try {
+      final selectedPath = await StorageService.browseCustomDatabaseFolder();
+      if (selectedPath != null) {
+        setState(() {
+          _customDatabasePath = selectedPath;
+          _currentStorageMode = 'custom';
+        });
+        
+        // Save the custom path
+        await StorageService.setCustomDatabasePath(selectedPath);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Custom folder selected: $selectedPath'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to select folder: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _saveSettings() async {
@@ -808,6 +835,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
             ),
           ),
         );
+        
+        // If switching to custom mode, ensure custom path is set
+        if (_currentStorageMode == 'custom' && _customDatabasePath.isEmpty) {
+          Navigator.pop(context); // Close loading
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a custom folder first'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
         
         // Migrate database
         await StorageService.migrateDatabaseLocation(_currentStorageMode);
