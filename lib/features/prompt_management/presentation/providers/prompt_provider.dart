@@ -137,6 +137,52 @@ class PromptProvider extends ChangeNotifier {
     await _loadData();
   }
 
+  Future<void> moveFolderToParent(String folderId, String newParentId) async {
+    // Get the folder to move
+    final folder = _folders.firstWhere((f) => f.id == folderId);
+    
+    // Update the folder's parent
+    final updatedFolder = folder.copyWith(parentId: newParentId);
+    
+    await StorageService.updateFolder(updatedFolder);
+    await _loadData();
+  }
+
+  Future<void> duplicateFolder(String folderId, String newName) async {
+    // Get the original folder
+    final originalFolder = _folders.firstWhere((f) => f.id == folderId);
+    
+    // Create new folder with same parent
+    final newFolder = PromptFolder(
+      name: newName,
+      parentId: originalFolder.parentId,
+    );
+    
+    // Insert the new folder
+    await StorageService.insertFolder(newFolder);
+    
+    // Get all prompts in the original folder
+    final originalPrompts = getPromptsInFolder(folderId);
+    
+    // Duplicate all prompts to the new folder
+    for (final prompt in originalPrompts) {
+      final duplicatedPrompt = PromptModel(
+        name: prompt.name,
+        description: prompt.description,
+        template: prompt.template,
+        category: prompt.category,
+        tags: List.from(prompt.tags),
+        variables: Map.from(prompt.variables),
+        parentFolderId: newFolder.id,
+        isFavorite: prompt.isFavorite,
+      );
+      
+      await StorageService.insertPrompt(duplicatedPrompt);
+    }
+    
+    await _loadData();
+  }
+
   // Prompt operations
   Future<void> createNewPrompt({
     required String name,

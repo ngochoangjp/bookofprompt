@@ -214,67 +214,165 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
     final isSelected = provider.selectedFolder?.id == folder.id;
     final promptCount = provider.getPromptsInFolder(folder.id).length;
 
-    return Card(
+    return Container(
       key: ValueKey(folder.id),
-      margin: const EdgeInsets.symmetric(vertical: 2),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-        ),
-        child: ExpansionTile(
-          leading: Icon(
-            folder.isExpanded ? Bootstrap.folder : Bootstrap.folder_fill,
-            color: Theme.of(context).colorScheme.primary,
-            size: 18,
-          ),
-          trailing: const SizedBox.shrink(), // Remove the default expansion arrow
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  folder.name,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+      child: DragTarget<PromptFolder>(
+        onWillAcceptWithDetails: (details) => details.data.id != folder.id,
+        onAcceptWithDetails: (details) {
+          provider.moveFolderToParent(details.data.id, folder.id);
+        },
+        builder: (context, candidateData, rejectedData) {
+          final isDragTarget = candidateData.isNotEmpty;
+          
+          return Draggable<PromptFolder>(
+            data: folder,
+            feedback: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
                   ),
                 ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Bootstrap.folder_fill,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      folder.name,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              if (promptCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
+            ),
+            childWhenDragging: Container(
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Bootstrap.folder,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                   ),
-                  child: Text(
-                    promptCount.toString(),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  const SizedBox(width: 12),
+                  Text(
+                    folder.name,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            child: GestureDetector(
+              onSecondaryTapDown: (details) {
+                _showFolderContextMenu(context, details.globalPosition, folder, provider);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: isDragTarget
+                      ? Border.all(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        )
+                      : null,
+                ),
+                child: Card(
+                  margin: EdgeInsets.zero,
+                  elevation: isDragTarget ? 8 : 1,
+                  color: isDragTarget 
+                      ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                      : null,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      dividerColor: Colors.transparent,
+                    ),
+                    child: ExpansionTile(
+                      leading: Icon(
+                        folder.isExpanded ? Bootstrap.folder : Bootstrap.folder_fill,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 18,
+                      ),
+                      trailing: const SizedBox.shrink(), // Remove the default expansion arrow
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              folder.name,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          if (promptCount > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                promptCount.toString(),
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      onExpansionChanged: (expanded) {
+                        // Update folder expansion state
+                        final updatedFolder = folder.copyWith(isExpanded: expanded);
+                        // Note: You might want to save this to storage
+                      },
+                      children: [
+                        ...provider.getPromptsInFolder(folder.id).map((prompt) {
+                          return _buildPromptTile(prompt, provider, isInFolder: true);
+                        }),
+                        if (promptCount == 0)
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'No prompts in this folder',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
-            ],
-          ),
-          onExpansionChanged: (expanded) {
-            // Update folder expansion state
-            final updatedFolder = folder.copyWith(isExpanded: expanded);
-            // Note: You might want to save this to storage
-          },
-          children: [
-            ...provider.getPromptsInFolder(folder.id).map((prompt) {
-              return _buildPromptTile(prompt, provider, isInFolder: true);
-            }),
-            if (promptCount == 0)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'No prompts in this folder',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
               ),
-          ],
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -316,7 +414,7 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
             prompt.headline, // Show headline instead of description
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: isSelected
-                  ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.7)
+                  ? Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.7)
                   : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             maxLines: 2,
@@ -428,12 +526,33 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
         PopupMenuItem(
           child: Row(
             children: [
+              const Icon(Bootstrap.folder_plus, size: 16),
+              const SizedBox(width: 8),
+              const Text('New Subfolder'),
+            ],
+          ),
+          onTap: () => _showCreateSubfolderDialog(folder, provider),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          child: Row(
+            children: [
               const Icon(Bootstrap.pencil, size: 16),
               const SizedBox(width: 8),
               const Text('Rename'),
             ],
           ),
           onTap: () => _showRenameFolderDialog(folder, provider),
+        ),
+        PopupMenuItem(
+          child: Row(
+            children: [
+              const Icon(Bootstrap.copy, size: 16),
+              const SizedBox(width: 8),
+              const Text('Duplicate'),
+            ],
+          ),
+          onTap: () => _showDuplicateFolderDialog(folder, provider),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
@@ -696,6 +815,77 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
             child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCreateSubfolderDialog(PromptFolder parentFolder, PromptProvider provider) {
+    final nameController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Create Subfolder in "${parentFolder.name}"'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'Subfolder Name',
+            hintText: 'Enter subfolder name',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.trim().isNotEmpty) {
+                provider.createNewFolder(
+                  name: nameController.text.trim(),
+                  parentId: parentFolder.id,
+                );
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDuplicateFolderDialog(PromptFolder folder, PromptProvider provider) {
+    final nameController = TextEditingController(text: '${folder.name} (Copy)');
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Duplicate "${folder.name}"'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'New Folder Name',
+            hintText: 'Enter new folder name',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.trim().isNotEmpty) {
+                provider.duplicateFolder(folder.id, nameController.text.trim());
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Duplicate'),
           ),
         ],
       ),
