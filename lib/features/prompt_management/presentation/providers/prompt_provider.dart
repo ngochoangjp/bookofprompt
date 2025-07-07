@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../../data/models/prompt_model.dart';
 import '../../data/services/storage_service.dart';
 
@@ -15,7 +16,7 @@ class PromptProvider extends ChangeNotifier {
   // UI state
   bool _isLoading = false;
   String _searchQuery = '';
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.dark;
   
   // Auto-save state
   Map<String, String> _currentVariables = {};
@@ -361,19 +362,34 @@ class PromptProvider extends ChangeNotifier {
   }
 
   // Export/Import functionality
-  Future<Map<String, dynamic>> exportData() async {
-    return {
+  Future<String> exportData() async {
+    final data = {
       'folders': _folders.map((f) => f.toMap()).toList(),
       'prompts': _allPrompts.map((p) => p.toMap()).toList(),
       'exported_at': DateTime.now().toIso8601String(),
       'version': '1.0.0',
+      'app_name': 'TremoPrompt',
+      'total_prompts': _allPrompts.length,
+      'total_folders': _folders.length,
     };
+    
+    // Return formatted JSON string
+    const encoder = JsonEncoder.withIndent('  ');
+    return encoder.convert(data);
   }
 
-  Future<void> importData(Map<String, dynamic> data) async {
+  Future<void> importData(String jsonData) async {
     _setLoading(true);
     
     try {
+      // Parse JSON
+      final data = jsonDecode(jsonData) as Map<String, dynamic>;
+      
+      // Validate format
+      if (!data.containsKey('folders') || !data.containsKey('prompts')) {
+        throw Exception('Invalid TremoPrompt export format');
+      }
+      
       // Clear existing data
       await StorageService.clearAllData();
       
@@ -395,6 +411,7 @@ class PromptProvider extends ChangeNotifier {
       await _loadData();
     } catch (e) {
       debugPrint('Error importing data: $e');
+      rethrow;
     } finally {
       _setLoading(false);
     }

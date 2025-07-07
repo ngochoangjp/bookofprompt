@@ -20,6 +20,7 @@ class StorageService {
   static const String _storageMode = 'storage_mode';
   static const String _systemMode = 'system';
   static const String _portableMode = 'portable';
+  static const String _customMode = 'custom';
 
   static Future<Database> get database async {
     if (_database != null) return _database!;
@@ -60,10 +61,20 @@ class StorageService {
         
         // Force use Documents folder for virtualized apps
         final documentsDir = await getApplicationDocumentsDirectory();
-        return join(documentsDir.path, 'PromptManager', _dbName);
+        return join(documentsDir.path, 'TremoPrompt', _dbName);
       }
       
       return join(executableDir, 'data', _dbName);
+    } else if (mode == _customMode) {
+      // Custom mode: Use user-specified folder
+      final customPath = await getCustomFolderPath();
+      if (customPath != null && await validateCustomFolder(customPath)) {
+        return join(customPath, 'TremoPrompt', _dbName);
+      } else {
+        // Fallback to system mode if no custom path set or invalid
+        final dbPath = await getDatabasesPath();
+        return join(dbPath, _dbName);
+      }
     } else {
       // System mode: Use standard OS location
       try {
@@ -236,6 +247,38 @@ class StorageService {
       return false;
     }
   }
+
+  // Custom folder management
+  static const String _customFolderKey = 'custom_folder_path';
+  
+  static Future<void> setCustomFolderPath(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_customFolderKey, path);
+  }
+  
+  static Future<String?> getCustomFolderPath() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_customFolderKey);
+  }
+  
+  static Future<bool> validateCustomFolder(String path) async {
+    try {
+      final directory = Directory(path);
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      
+      // Test write permission
+      final testFile = File(join(path, 'test_write.tmp'));
+      await testFile.writeAsString('test');
+      await testFile.delete();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+
 
 
 

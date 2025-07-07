@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:icons_plus/icons_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../providers/prompt_provider.dart';
 import '../widgets/sidebar_tree_panel.dart';
@@ -394,18 +395,30 @@ class _PromptManagerScreenState extends State<PromptManagerScreen> with TickerPr
     final provider = context.read<PromptProvider>();
     
     try {
-      final data = await provider.exportData();
-      
-      // In a real app, you would use file_picker to save the file
-      // For now, we'll just copy to clipboard
-      Clipboard.setData(ClipboardData(text: data.toString()));
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Export data copied to clipboard'),
-          duration: Duration(seconds: 3),
-        ),
+      // Show file picker to choose save location
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Export TremoPrompt Library',
+        fileName: 'tremoprompt_export_${DateTime.now().toIso8601String().split('T')[0]}.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
       );
+      
+      if (result != null) {
+        final jsonData = await provider.exportData();
+        final file = File(result);
+        await file.writeAsString(jsonData);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export saved to: ${file.path}'),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Open Folder',
+              onPressed: () => Process.run('explorer', ['/select,', file.path]),
+            ),
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -416,34 +429,65 @@ class _PromptManagerScreenState extends State<PromptManagerScreen> with TickerPr
     }
   }
 
-  void _importData() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Import Data'),
-        content: const Text(
-          'Import functionality would typically use file picker to select a JSON file. '
-          'This is a placeholder for the import feature.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Import feature coming soon'),
+  void _importData() async {
+    try {
+      // Show file picker to choose JSON file to import
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        dialogTitle: 'Import TremoPrompt Library',
+      );
+      
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final jsonData = await file.readAsString();
+        
+        // Show confirmation dialog
+        final shouldImport = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Import TremoPrompt Library'),
+            content: const Text(
+              'This will replace all your current prompts and folders with the imported data. '
+              'Are you sure you want to continue?\n\n'
+              'Note: This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
                 ),
-              );
-            },
-            child: const Text('Import'),
+                child: const Text('Import'),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
+        
+        if (shouldImport == true) {
+          final provider = context.read<PromptProvider>();
+          await provider.importData(jsonData);
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Import completed successfully!'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Import failed: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   void _showSettingsDialog() {
@@ -613,6 +657,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   String _currentDatabasePath = '';
   bool _isPortableAvailable = false;
   bool _isVirtualizedEnvironment = false;
+  String? _customFolderPath;
 
   @override
   void initState() {
@@ -625,13 +670,58 @@ class _SettingsDialogState extends State<SettingsDialog> {
     final path = await StorageService.getCurrentDatabasePath();
     final portable = await StorageService.isPortableModeAvailable();
     final virtualized = await StorageService.isVirtualizedEnvironment();
+    final customPath = await StorageService.getCustomFolderPath();
     
     setState(() {
       _currentStorageMode = mode;
       _currentDatabasePath = path;
       _isPortableAvailable = portable;
       _isVirtualizedEnvironment = virtualized;
+      _customFolderPath = customPath;
     });
+  }
+
+  Future<void> _selectCustomFolder() async {
+    try {
+      // Show folder picker
+      final result = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Select TremoPrompt Data Folder',
+      );
+      
+      if (result != null) {
+        // Validate the selected folder
+        final isValid = await StorageService.validateCustomFolder(result);
+        
+        if (isValid) {
+          await StorageService.setCustomFolderPath(result);
+          setState(() {
+            _currentStorageMode = 'custom';
+            _customFolderPath = result;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Custom folder set: $result'),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Selected folder is not writable. Please choose another location.'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to select folder: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
 
@@ -713,25 +803,70 @@ class _SettingsDialogState extends State<SettingsDialog> {
             
             const SizedBox(height: 8),
             
-            // Portable Storage Option
+            // Custom Folder Option
             RadioListTile<String>(
-              title: const Text('Portable Mode'),
-              subtitle: Text(
-                _isPortableAvailable
-                    ? (_isVirtualizedEnvironment 
-                        ? 'Uses application folder\n• May not work in virtualized environment\n• Will fallback to Documents folder\n• System folder recommended instead'
-                        : 'Uses application folder\n• Good for USB drives\n• Easy manual backup\n• Data moves with app')
-                    : 'Not available (no write permission)',
+              title: const Text('Custom Folder'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Choose your own storage location\n• Full control over data location\n• Easy backup and sync'),
+                  if (_customFolderPath != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Current: $_customFolderPath',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              value: 'portable',
+              value: 'custom',
               groupValue: _currentStorageMode,
-              onChanged: _isPortableAvailable ? (value) {
+              onChanged: (value) async {
                 if (value != null) {
-                  setState(() {
-                    _currentStorageMode = value;
-                  });
+                  await _selectCustomFolder();
                 }
-              } : null,
+              },
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Import/Export Section
+            Text(
+              'Import/Export Data',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      // Call import from parent widget
+                      final parentState = context.findAncestorStateOfType<_PromptManagerScreenState>();
+                      parentState?._importData();
+                    },
+                    icon: const Icon(Bootstrap.upload, size: 16),
+                    label: const Text('Import Library'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      // Call export from parent widget  
+                      final parentState = context.findAncestorStateOfType<_PromptManagerScreenState>();
+                      parentState?._exportData();
+                    },
+                    icon: const Icon(Bootstrap.download, size: 16),
+                    label: const Text('Export Library'),
+                  ),
+                ),
+              ],
             ),
             
             const SizedBox(height: 16),
@@ -776,6 +911,17 @@ class _SettingsDialogState extends State<SettingsDialog> {
     
     if (_currentStorageMode != currentMode) {
       try {
+        // For custom mode, ensure custom folder is set
+        if (_currentStorageMode == 'custom' && _customFolderPath == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a custom folder first'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+        
         // Show loading
         showDialog(
           context: context,
