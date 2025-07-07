@@ -1,4 +1,4 @@
-package com.example.prompt_manager
+package com.tremowaves.tremoprompt
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -5,7 +5,6 @@ import '../models/prompt_model.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:file_picker/file_picker.dart';
 
 class StorageService {
   static Database? _database;
@@ -19,9 +18,8 @@ class StorageService {
 
   // Storage mode preference
   static const String _storageMode = 'storage_mode';
-  static const String _customDatabasePath = 'custom_database_path';
   static const String _systemMode = 'system';
-  static const String _customMode = 'custom';
+  static const String _portableMode = 'portable';
 
   static Future<Database> get database async {
     if (_database != null) return _database!;
@@ -51,16 +49,21 @@ class StorageService {
   static Future<String> getDatabasePath() async {
     final mode = await getStorageMode();
     
-    if (mode == _customMode) {
-      // Custom mode: Use user-selected directory
-      final customPath = await getCustomDatabasePath();
-      if (customPath != null && customPath.isNotEmpty) {
-        return join(customPath, _dbName);
-      } else {
-        // Fallback to system mode if custom path not set
-        final dbPath = await getDatabasesPath();
-        return join(dbPath, _dbName);
+    if (mode == _portableMode) {
+      // Portable mode: Use application directory
+      final executableDir = File(Platform.resolvedExecutable).parent.path;
+      
+      // Check if running from Enigma Virtual Box or similar virtualizer
+      if (await _isVirtualizedEnvironment()) {
+        print('WARNING: Detected virtualized environment (Enigma Virtual Box?)');
+        print('Portable mode may not work correctly. Using Documents folder instead.');
+        
+        // Force use Documents folder for virtualized apps
+        final documentsDir = await getApplicationDocumentsDirectory();
+        return join(documentsDir.path, 'PromptManager', _dbName);
       }
+      
+      return join(executableDir, 'data', _dbName);
     } else {
       // System mode: Use standard OS location
       try {
@@ -74,7 +77,42 @@ class StorageService {
     }
   }
 
-
+  // Detect if running in virtualized environment (Enigma Virtual Box, etc.)
+  static Future<bool> _isVirtualizedEnvironment() async {
+    try {
+      final executablePath = Platform.resolvedExecutable;
+      final executableDir = File(executablePath).parent.path;
+      
+      // Check common signs of virtualized environment
+      // 1. Running from temp directory
+      if (executableDir.contains('Temp') || executableDir.contains('TEMP')) {
+        return true;
+      }
+      
+      // 2. Check if directory is read-only or temporary
+      final testPath = join(executableDir, 'test_write_evb.tmp');
+      final testFile = File(testPath);
+      
+      try {
+        await testFile.writeAsString('test');
+        await testFile.delete();
+        
+        // 3. Check if path looks like EVB extraction path
+        if (executableDir.contains('EnigmaVB') || 
+            executableDir.contains('_virtual_') ||
+            executableDir.length > 200) { // Very long paths often indicate virtualization
+          return true;
+        }
+        
+        return false;
+      } catch (e) {
+        // Cannot write = likely virtualized
+        return true;
+      }
+    } catch (e) {
+      return false;
+    }
+  }
 
   static Future<Database> _initDatabase() async {
     try {
@@ -181,69 +219,6 @@ class StorageService {
   }
 
 
-
-  // Get custom database path
-  static Future<String?> getCustomDatabasePath() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_customDatabasePath);
-  }
-
-  // Set custom database path
-  static Future<void> setCustomDatabasePath(String path) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_customDatabasePath, path);
-    
-    // Ensure directory exists
-    final directory = Directory(path);
-    if (!await directory.exists()) {
-      await directory.create(recursive: true);
-    }
-  }
-
-  // Validate if custom path is writable
-  static Future<bool> isCustomPathValid(String path) async {
-    try {
-      final directory = Directory(path);
-      if (!await directory.exists()) {
-        return false;
-      }
-      
-      // Test write permission
-      final testPath = join(path, 'test_write.tmp');
-      final testFile = File(testPath);
-      
-      await testFile.writeAsString('test');
-      await testFile.delete();
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // Browse for custom database folder
-  static Future<String?> browseCustomDatabaseFolder() async {
-    try {
-      final result = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'Select Database Folder',
-        lockParentWindow: true,
-      );
-      
-      if (result != null) {
-        // Validate the selected path
-        if (await isCustomPathValid(result)) {
-          return result;
-        } else {
-          print('Selected folder is not writable: $result');
-          return null;
-        }
-      }
-      
-      return null;
-    } catch (e) {
-      print('Error selecting folder: $e');
-      return null;
-    }
-  }
 
   static Future<void> _createTables(Database db, int version) async {
     // Create prompts table

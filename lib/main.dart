@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<PromptProvider>(
         builder: (context, promptProvider, child) {
           return MaterialApp(
-            title: 'Prompt Manager',
+            title: 'TremoPrompt',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,

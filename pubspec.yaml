@@ -1,5 +1,5 @@
-name: prompt_manager
-description: Advanced Prompt Manager - Organize, create, and manage AI prompts efficiently
+name: tremo_prompt
+description: TremoPrompt - Advanced AI prompt organizer and manager
 publish_to: 'none'
 version: 1.0.2+1
 
@@ -58,19 +58,19 @@ flutter:
     - assets/images/
 
 msix:
-  display_name: Prompt Manager
-  publisher_display_name: Prompt Manager Team
-  identity_name: PromptManager
+  display_name: TremoPrompt
+  publisher_display_name: Tremowaves
+  identity_name: Tremowaves.TremoPrompt
   msix_version: 1.0.2.0
-  description: Advanced Prompt Manager for AI workflows
-  execution_alias: promptmanager
+  description: TremoPrompt - Advanced AI prompt organizer and manager
+  execution_alias: tremoprompt
   logo_path: assets/icons/app_icon.png 
 
 # MSIX Configuration for Windows Store
 msix_config:
-  display_name: Prompt Manager
-  publisher_display_name: Your Company
-  identity_name: YourCompany.PromptManager
+  display_name: TremoPrompt
+  publisher_display_name: Tremowaves
+  identity_name: Tremowaves.TremoPrompt
   msix_version: 1.0.0.0
   logo_path: windows/runner/resources/app_icon.ico
   start_menu_icon_path: windows/runner/resources/app_icon.ico
