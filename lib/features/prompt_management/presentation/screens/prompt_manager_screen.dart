@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:icons_plus/icons_plus.dart';
+import 'dart:io';
 import '../providers/prompt_provider.dart';
 import '../widgets/sidebar_tree_panel.dart';
 import '../widgets/main_content_panel.dart';
 import '../widgets/history_panel.dart';
+import '../../data/services/storage_service.dart';
 
 class PromptManagerScreen extends StatefulWidget {
   const PromptManagerScreen({super.key});
@@ -109,12 +111,23 @@ class _PromptManagerScreenState extends State<PromptManagerScreen> with TickerPr
               value: 'toggle_history',
               child: Row(
                 children: [
-                                     Icon(
-                     _isHistoryPanelVisible ? Bootstrap.columns : Bootstrap.columns,
-                     size: 16,
-                   ),
+                  Icon(
+                    _isHistoryPanelVisible ? Bootstrap.columns : Bootstrap.columns,
+                    size: 16,
+                  ),
                   const SizedBox(width: 8),
                   Text(_isHistoryPanelVisible ? 'Hide History' : 'Show History'),
+                ],
+              ),
+            ),
+            const PopupMenuDivider(),
+            PopupMenuItem(
+              value: 'settings',
+              child: Row(
+                children: [
+                  const Icon(Bootstrap.gear, size: 16),
+                  const SizedBox(width: 8),
+                  const Text('Settings'),
                 ],
               ),
             ),
@@ -208,7 +221,7 @@ class _PromptManagerScreenState extends State<PromptManagerScreen> with TickerPr
     );
   }
 
-  void _handleViewAction(String action) {
+  void _handleViewAction(String action) async {
     switch (action) {
       case 'toggle_sidebar':
         setState(() {
@@ -220,12 +233,15 @@ class _PromptManagerScreenState extends State<PromptManagerScreen> with TickerPr
           _isHistoryPanelVisible = !_isHistoryPanelVisible;
         });
         break;
-      case 'export':
-        _exportData();
+      case 'settings':
+        _showSettingsDialog();
         break;
-      case 'import':
-        _importData();
-        break;
+              case 'export':
+          _exportData();
+          break;
+        case 'import':
+          _importData();
+          break;
     }
   }
 
@@ -430,6 +446,13 @@ class _PromptManagerScreenState extends State<PromptManagerScreen> with TickerPr
     );
   }
 
+  void _showSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => const SettingsDialog(),
+    );
+  }
+
   // Keyboard shortcuts
   Widget _buildWithKeyboardShortcuts() {
     return Shortcuts(
@@ -576,4 +599,247 @@ class SearchIntent extends Intent {
 
 class GenerateIntent extends Intent {
   const GenerateIntent();
+}
+
+class SettingsDialog extends StatefulWidget {
+  const SettingsDialog({super.key});
+
+  @override
+  State<SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends State<SettingsDialog> {
+  String _currentStorageMode = 'system';
+  String _currentDatabasePath = '';
+  bool _isPortableAvailable = false;
+  bool _isVirtualizedEnvironment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final mode = await StorageService.getStorageMode();
+    final path = await StorageService.getCurrentDatabasePath();
+    final portable = await StorageService.isPortableModeAvailable();
+    final virtualized = await _checkVirtualizedEnvironment();
+    
+    setState(() {
+      _currentStorageMode = mode;
+      _currentDatabasePath = path;
+      _isPortableAvailable = portable;
+      _isVirtualizedEnvironment = virtualized;
+    });
+  }
+
+  Future<bool> _checkVirtualizedEnvironment() async {
+    try {
+      final executablePath = Platform.resolvedExecutable;
+      final executableDir = File(executablePath).parent.path;
+      
+      // Check signs of virtualized environment
+      if (executableDir.contains('Temp') || 
+          executableDir.contains('TEMP') ||
+          executableDir.contains('EnigmaVB') ||
+          executableDir.contains('_virtual_') ||
+          executableDir.length > 200) {
+        return true;
+      }
+      
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Settings'),
+      content: SizedBox(
+        width: 500,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Data Storage Location',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 16),
+            
+            // Virtualized Environment Warning
+            if (_isVirtualizedEnvironment)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  border: Border.all(color: Colors.orange.shade400),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Bootstrap.exclamation_triangle,
+                      color: Colors.orange.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Virtualized Environment Detected',
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: Colors.orange.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'App appears to be running from Enigma Virtual Box or similar. '
+                            'Portable mode may not work correctly. System folder is recommended.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            
+            // System Storage Option
+            RadioListTile<String>(
+              title: const Text('System Folder'),
+              subtitle: const Text('Recommended: Uses standard OS location\n• Windows: %APPDATA%\n• Backed up with user profile\n• Secure and standard'),
+              value: 'system',
+              groupValue: _currentStorageMode,
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _currentStorageMode = value;
+                  });
+                }
+              },
+            ),
+            
+            const SizedBox(height: 8),
+            
+            // Portable Storage Option
+            RadioListTile<String>(
+              title: const Text('Portable Mode'),
+              subtitle: Text(
+                _isPortableAvailable
+                    ? (_isVirtualizedEnvironment 
+                        ? 'Uses application folder\n• May not work in virtualized environment\n• Will fallback to Documents folder\n• System folder recommended instead'
+                        : 'Uses application folder\n• Good for USB drives\n• Easy manual backup\n• Data moves with app')
+                    : 'Not available (no write permission)',
+              ),
+              value: 'portable',
+              groupValue: _currentStorageMode,
+              onChanged: _isPortableAvailable ? (value) {
+                if (value != null) {
+                  setState(() {
+                    _currentStorageMode = value;
+                  });
+                }
+              } : null,
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Current Database Path
+            Text(
+              'Current Database Location:',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: SelectableText(
+                _currentDatabasePath,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saveSettings,
+          child: const Text('Apply'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveSettings() async {
+    final currentMode = await StorageService.getStorageMode();
+    
+    if (_currentStorageMode != currentMode) {
+      try {
+        // Show loading
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Migrating database...'),
+              ],
+            ),
+          ),
+        );
+        
+        // Migrate database
+        await StorageService.migrateDatabaseLocation(_currentStorageMode);
+        
+        // Close loading dialog
+        Navigator.pop(context);
+        
+        // Close settings dialog
+        Navigator.pop(context);
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Storage location changed to $_currentStorageMode mode'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+      } catch (e) {
+        // Close loading dialog
+        Navigator.pop(context);
+        
+        // Show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to change storage location: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      Navigator.pop(context);
+    }
+  }
 } 

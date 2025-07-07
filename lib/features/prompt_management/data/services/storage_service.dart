@@ -2,16 +2,24 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/prompt_model.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageService {
   static Database? _database;
   static const String _dbName = 'prompt_manager.db';
-  static const int _dbVersion = 1;
+  static const int _dbVersion = 2;
 
   // Table names
   static const String _promptsTable = 'prompts';
   static const String _foldersTable = 'folders';
   static const String _historyTable = 'generated_prompts';
+
+  // Storage mode preference
+  static const String _storageMode = 'storage_mode';
+  static const String _systemMode = 'system';
+  static const String _portableMode = 'portable';
 
   static Future<Database> get database async {
     if (_database != null) return _database!;
@@ -19,16 +27,210 @@ class StorageService {
     return _database!;
   }
 
-  static Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _dbName);
+  // Get storage mode preference
+  static Future<String> getStorageMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_storageMode) ?? _systemMode;
+  }
 
-    return await openDatabase(
-      path,
-      version: _dbVersion,
-      onCreate: _createTables,
-      onUpgrade: _onUpgrade,
-    );
+  // Set storage mode preference
+  static Future<void> setStorageMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_storageMode, mode);
+    
+    // Close current database and reinitialize with new path
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+  }
+
+  // Get database path based on storage mode
+  static Future<String> getDatabasePath() async {
+    final mode = await getStorageMode();
+    
+    if (mode == _portableMode) {
+      // Portable mode: Use application directory
+      final executableDir = File(Platform.resolvedExecutable).parent.path;
+      
+      // Check if running from Enigma Virtual Box or similar virtualizer
+      if (await _isVirtualizedEnvironment()) {
+        print('WARNING: Detected virtualized environment (Enigma Virtual Box?)');
+        print('Portable mode may not work correctly. Using Documents folder instead.');
+        
+        // Force use Documents folder for virtualized apps
+        final documentsDir = await getApplicationDocumentsDirectory();
+        return join(documentsDir.path, 'PromptManager', _dbName);
+      }
+      
+      return join(executableDir, 'data', _dbName);
+    } else {
+      // System mode: Use standard OS location
+      try {
+        final dbPath = await getDatabasesPath();
+        return join(dbPath, _dbName);
+      } catch (e) {
+        // Fallback to app directory
+        final appDir = await getApplicationDocumentsDirectory();
+        return join(appDir.path, _dbName);
+      }
+    }
+  }
+
+  // Detect if running in virtualized environment (Enigma Virtual Box, etc.)
+  static Future<bool> _isVirtualizedEnvironment() async {
+    try {
+      final executablePath = Platform.resolvedExecutable;
+      final executableDir = File(executablePath).parent.path;
+      
+      // Check common signs of virtualized environment
+      // 1. Running from temp directory
+      if (executableDir.contains('Temp') || executableDir.contains('TEMP')) {
+        return true;
+      }
+      
+      // 2. Check if directory is read-only or temporary
+      final testPath = join(executableDir, 'test_write_evb.tmp');
+      final testFile = File(testPath);
+      
+      try {
+        await testFile.writeAsString('test');
+        await testFile.delete();
+        
+        // 3. Check if path looks like EVB extraction path
+        if (executableDir.contains('EnigmaVB') || 
+            executableDir.contains('_virtual_') ||
+            executableDir.length > 200) { // Very long paths often indicate virtualization
+          return true;
+        }
+        
+        return false;
+      } catch (e) {
+        // Cannot write = likely virtualized
+        return true;
+      }
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<Database> _initDatabase() async {
+    try {
+      final path = await getDatabasePath();
+      
+      // Ensure directory exists for portable mode
+      final directory = Directory(dirname(path));
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      
+      print('===== DATABASE DEBUG =====');
+      print('Storage mode: ${await getStorageMode()}');
+      print('Database path: $path');
+      print('==========================');
+
+      // Test write permissions
+      try {
+        final testFile = File('${dirname(path)}/test_write.txt');
+        await testFile.writeAsString('test');
+        await testFile.delete();
+        print('Write permissions: OK');
+      } catch (e) {
+        print('Write permissions: FAILED - $e');
+        // Force fallback to app directory
+        final appDir = await getApplicationDocumentsDirectory();
+        final fallbackPath = join(appDir.path, _dbName);
+        print('Using fallback path: $fallbackPath');
+        
+        return await openDatabase(
+          fallbackPath,
+          version: _dbVersion,
+          onCreate: _createTables,
+          onUpgrade: _onUpgrade,
+        );
+      }
+
+      final db = await openDatabase(
+        path,
+        version: _dbVersion,
+        onCreate: _createTables,
+        onUpgrade: _onUpgrade,
+      );
+      
+      print('Database opened successfully');
+      
+      // Test database with simple query
+      final testResult = await db.rawQuery('SELECT name FROM sqlite_master WHERE type="table"');
+      print('Database tables: $testResult');
+      
+      return db;
+    } catch (e) {
+      print('CRITICAL ERROR in _initDatabase: $e');
+      print('Stack trace: ${StackTrace.current}');
+      rethrow;
+    }
+  }
+
+  // Migration helper: Move database between storage modes
+  static Future<void> migrateDatabaseLocation(String newMode) async {
+    final currentMode = await getStorageMode();
+    if (currentMode == newMode) return;
+    
+    try {
+      // Get current and new paths
+      await setStorageMode(currentMode); // Ensure current mode is set
+      final oldPath = await getDatabasePath();
+      
+      await setStorageMode(newMode);
+      final newPath = await getDatabasePath();
+      
+      // Copy database if old one exists
+      final oldFile = File(oldPath);
+      if (await oldFile.exists()) {
+        final newDirectory = Directory(dirname(newPath));
+        if (!await newDirectory.exists()) {
+          await newDirectory.create(recursive: true);
+        }
+        
+        await oldFile.copy(newPath);
+        print('Database migrated from $oldPath to $newPath');
+        
+        // Optionally delete old file (ask user)
+        // await oldFile.delete();
+      }
+      
+      // Close current database connection
+      if (_database != null) {
+        await _database!.close();
+        _database = null;
+      }
+      
+    } catch (e) {
+      print('Database migration failed: $e');
+      // Revert to old mode
+      await setStorageMode(currentMode);
+      rethrow;
+    }
+  }
+
+  // Get current database file path for user information
+  static Future<String> getCurrentDatabasePath() async {
+    return await getDatabasePath();
+  }
+
+  // Check if portable mode is available
+  static Future<bool> isPortableModeAvailable() async {
+    try {
+      final executableDir = File(Platform.resolvedExecutable).parent.path;
+      final testPath = join(executableDir, 'test_write.tmp');
+      final testFile = File(testPath);
+      
+      await testFile.writeAsString('test');
+      await testFile.delete();
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   static Future<void> _createTables(Database db, int version) async {
