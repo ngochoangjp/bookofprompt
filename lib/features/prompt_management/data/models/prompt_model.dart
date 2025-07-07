@@ -12,6 +12,7 @@ class PromptModel {
   final DateTime updatedAt;
   final bool isFavorite;
   final String? parentFolderId;
+  final int sortOrder;
 
   PromptModel({
     String? id,
@@ -25,6 +26,7 @@ class PromptModel {
     DateTime? updatedAt,
     this.isFavorite = false,
     this.parentFolderId,
+    this.sortOrder = 0,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
@@ -71,6 +73,7 @@ class PromptModel {
     DateTime? updatedAt,
     bool? isFavorite,
     String? parentFolderId,
+    int? sortOrder,
   }) {
     return PromptModel(
       id: id ?? this.id,
@@ -84,6 +87,7 @@ class PromptModel {
       updatedAt: updatedAt ?? DateTime.now(),
       isFavorite: isFavorite ?? this.isFavorite,
       parentFolderId: parentFolderId ?? this.parentFolderId,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 
@@ -97,10 +101,11 @@ class PromptModel {
       'category': category,
       'tags': tags.join(','),
       'variables': variables.entries.map((e) => '${e.key}:${e.value}').join('|'),
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-      'isFavorite': isFavorite ? 1 : 0,
-      'parentFolderId': parentFolderId,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+      'is_favorite': isFavorite ? 1 : 0,
+      'parent_folder_id': parentFolderId,
+      'sort_order': sortOrder,
     };
   }
 
@@ -129,10 +134,11 @@ class PromptModel {
       category: map['category'] as String? ?? 'General',
       tags: tags,
       variables: variables,
-      createdAt: DateTime.parse(map['createdAt'] as String),
-      updatedAt: DateTime.parse(map['updatedAt'] as String),
-      isFavorite: (map['isFavorite'] as int? ?? 0) == 1,
-      parentFolderId: map['parentFolderId'] as String?,
+      createdAt: DateTime.parse(map['created_at'] as String),
+      updatedAt: DateTime.parse(map['updated_at'] as String),
+      isFavorite: (map['is_favorite'] as int? ?? 0) == 1,
+      parentFolderId: map['parent_folder_id'] as String?,
+      sortOrder: map['sort_order'] as int? ?? 0,
     );
   }
 }
@@ -145,6 +151,7 @@ class PromptFolder {
   final DateTime updatedAt;
   final bool isExpanded;
   final List<PromptModel> prompts;
+  final int sortOrder;
 
   PromptFolder({
     String? id,
@@ -154,6 +161,7 @@ class PromptFolder {
     DateTime? updatedAt,
     this.isExpanded = true,
     this.prompts = const [],
+    this.sortOrder = 0,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
@@ -167,6 +175,7 @@ class PromptFolder {
     DateTime? updatedAt,
     bool? isExpanded,
     List<PromptModel>? prompts,
+    int? sortOrder,
   }) {
     return PromptFolder(
       id: id ?? this.id,
@@ -176,6 +185,7 @@ class PromptFolder {
       updatedAt: updatedAt ?? DateTime.now(),
       isExpanded: isExpanded ?? this.isExpanded,
       prompts: prompts ?? this.prompts,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 
@@ -184,10 +194,11 @@ class PromptFolder {
     return {
       'id': id,
       'name': name,
-      'parentId': parentId,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-      'isExpanded': isExpanded ? 1 : 0,
+      'parent_id': parentId,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+      'is_expanded': isExpanded ? 1 : 0,
+      'sort_order': sortOrder,
     };
   }
 
@@ -196,10 +207,11 @@ class PromptFolder {
     return PromptFolder(
       id: map['id'] as String,
       name: map['name'] as String,
-      parentId: map['parentId'] as String?,
-      createdAt: DateTime.parse(map['createdAt'] as String),
-      updatedAt: DateTime.parse(map['updatedAt'] as String),
-      isExpanded: (map['isExpanded'] as int? ?? 1) == 1,
+      parentId: map['parent_id'] as String?,
+      createdAt: DateTime.parse(map['created_at'] as String),
+      updatedAt: DateTime.parse(map['updated_at'] as String),
+      isExpanded: (map['is_expanded'] as int? ?? 1) == 1,
+      sortOrder: map['sort_order'] as int? ?? 0,
     );
   }
 }

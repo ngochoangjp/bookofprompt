@@ -68,9 +68,17 @@ class PromptProvider extends ChangeNotifier {
     _folders = await StorageService.getAllFolders();
     _allPrompts = await StorageService.getAllPrompts();
     
+    // Sort folders by sortOrder
+    _folders.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    
+    // Sort prompts by sortOrder
+    _allPrompts.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    
     // Organize prompts into folders
     for (final folder in _folders) {
       final folderPrompts = _allPrompts.where((p) => p.parentFolderId == folder.id).toList();
+      // Sort prompts within folder by sortOrder
+      folderPrompts.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
       final updatedFolder = folder.copyWith(prompts: folderPrompts);
       final index = _folders.indexOf(folder);
       _folders[index] = updatedFolder;
@@ -358,24 +366,43 @@ class PromptProvider extends ChangeNotifier {
 
   // Drag & Drop support
   Future<void> reorderFolders(List<PromptFolder> newOrder) async {
+    // Update sort order for each folder
+    for (int i = 0; i < newOrder.length; i++) {
+      final updatedFolder = newOrder[i].copyWith(sortOrder: i);
+      newOrder[i] = updatedFolder;
+      // Save to storage
+      await StorageService.updateFolder(updatedFolder);
+    }
+    
     _folders = newOrder;
     notifyListeners();
-    
-    // Save new order to storage (if needed)
-    // This could be implemented with a sort_order field
   }
 
   Future<void> reorderPrompts(String folderId, List<PromptModel> newOrder) async {
+    // Update sort order for each prompt
+    for (int i = 0; i < newOrder.length; i++) {
+      final updatedPrompt = newOrder[i].copyWith(sortOrder: i);
+      newOrder[i] = updatedPrompt;
+      // Save to storage
+      await StorageService.updatePrompt(updatedPrompt);
+    }
+    
     // Update local state
     final folderIndex = _folders.indexWhere((f) => f.id == folderId);
     if (folderIndex != -1) {
       final updatedFolder = _folders[folderIndex].copyWith(prompts: newOrder);
       _folders[folderIndex] = updatedFolder;
-      notifyListeners();
     }
     
-    // Save new order to storage (if needed)
-    // This could be implemented with a sort_order field
+    // Update _allPrompts array with new order
+    for (final prompt in newOrder) {
+      final index = _allPrompts.indexWhere((p) => p.id == prompt.id);
+      if (index != -1) {
+        _allPrompts[index] = prompt;
+      }
+    }
+    
+    notifyListeners();
   }
 
   // Export/Import functionality
@@ -436,7 +463,10 @@ class PromptProvider extends ChangeNotifier {
   }
 
   List<PromptModel> getPromptsInFolder(String folderId) {
-    return _allPrompts.where((p) => p.parentFolderId == folderId).toList();
+    final prompts = _allPrompts.where((p) => p.parentFolderId == folderId).toList();
+    // Sort by sortOrder
+    prompts.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return prompts;
   }
 
   // Statistics

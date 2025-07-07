@@ -187,7 +187,10 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
       itemCount: filteredPrompts.length,
       itemBuilder: (context, index) {
         final prompt = filteredPrompts[index];
-        return _buildPromptTile(prompt, provider);
+        return Container(
+          key: ValueKey('search_${prompt.id}'),
+          child: _buildPromptTile(prompt, provider),
+        );
       },
     );
   }
@@ -205,7 +208,10 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
         provider.reorderFolders(folders);
       },
       children: provider.folders.map((folder) {
-        return _buildFolderTile(folder, provider);
+        return Container(
+          key: ValueKey('folder_${folder.id}'),
+          child: _buildFolderTile(folder, provider),
+        );
       }).toList(),
     );
   }
@@ -215,7 +221,7 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
     final promptCount = provider.getPromptsInFolder(folder.id).length;
 
     return Card(
-      key: ValueKey(folder.id),
+      key: ValueKey('folder_tile_${folder.id}'),
       margin: const EdgeInsets.symmetric(vertical: 2),
       child: Theme(
         data: Theme.of(context).copyWith(
@@ -259,10 +265,9 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
             // Note: You might want to save this to storage
           },
           children: [
-            ...provider.getPromptsInFolder(folder.id).map((prompt) {
-              return _buildPromptTile(prompt, provider, isInFolder: true);
-            }),
-            if (promptCount == 0)
+            if (promptCount > 0)
+              _buildReorderablePromptList(folder, provider)
+            else
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
@@ -278,6 +283,30 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
     );
   }
 
+  Widget _buildReorderablePromptList(PromptFolder folder, PromptProvider provider) {
+    final folderPrompts = provider.getPromptsInFolder(folder.id);
+    
+    return ReorderableListView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      onReorder: (oldIndex, newIndex) {
+        if (newIndex > oldIndex) {
+          newIndex -= 1;
+        }
+        final prompts = List<PromptModel>.from(folderPrompts);
+        final prompt = prompts.removeAt(oldIndex);
+        prompts.insert(newIndex, prompt);
+        provider.reorderPrompts(folder.id, prompts);
+      },
+      children: folderPrompts.map((prompt) {
+        return Container(
+          key: ValueKey('reorder_${prompt.id}'),
+          child: _buildPromptTile(prompt, provider, isInFolder: true),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildPromptTile(PromptModel prompt, PromptProvider provider, {bool isInFolder = false}) {
     final isSelected = provider.selectedPrompt?.id == prompt.id;
 
@@ -286,7 +315,7 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
         _showPromptContextMenu(context, details.globalPosition, prompt, provider);
       },
       child: Card(
-        key: ValueKey(prompt.id),
+        key: ValueKey('prompt_tile_${prompt.id}'),
         margin: EdgeInsets.symmetric(
           vertical: 1,
           horizontal: isInFolder ? 16 : 0,

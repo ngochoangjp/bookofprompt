@@ -8,7 +8,7 @@ import 'dart:io'; // Added for File
 class StorageService {
   static Database? _database;
   static const String _dbName = 'prompt_manager.db';
-  static const int _dbVersion = 1;
+  static const int _dbVersion = 2;
 
   // Table names
   static const String _promptsTable = 'prompts';
@@ -87,7 +87,8 @@ class StorageService {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         is_favorite INTEGER NOT NULL DEFAULT 0,
-        parent_folder_id TEXT
+        parent_folder_id TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -99,7 +100,8 @@ class StorageService {
         parent_id TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        is_expanded INTEGER NOT NULL DEFAULT 1
+        is_expanded INTEGER NOT NULL DEFAULT 1,
+        sort_order INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -122,8 +124,10 @@ class StorageService {
 
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // Handle database upgrades
-    if (oldVersion < newVersion) {
-      // Add upgrade logic here when needed
+    if (oldVersion < 2) {
+      // Add sort_order column to existing tables
+      await db.execute('ALTER TABLE $_promptsTable ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE $_foldersTable ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
     }
   }
 
@@ -137,6 +141,7 @@ class StorageService {
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
         'is_expanded': 1,
+        'sort_order': 0,
       },
       {
         'id': 'work',
@@ -145,6 +150,7 @@ class StorageService {
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
         'is_expanded': 1,
+        'sort_order': 1,
       },
       {
         'id': 'personal',
@@ -153,6 +159,7 @@ class StorageService {
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
         'is_expanded': 1,
+        'sort_order': 2,
       },
     ];
 
@@ -174,6 +181,7 @@ class StorageService {
         'updated_at': DateTime.now().toIso8601String(),
         'is_favorite': 0,
         'parent_folder_id': 'work',
+        'sort_order': 0,
       },
       {
         'id': 'sample2',
@@ -187,6 +195,7 @@ class StorageService {
         'updated_at': DateTime.now().toIso8601String(),
         'is_favorite': 1,
         'parent_folder_id': 'work',
+        'sort_order': 1,
       },
     ];
 
