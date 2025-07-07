@@ -17,6 +17,7 @@ class MainContentPanel extends StatefulWidget {
 class _MainContentPanelState extends State<MainContentPanel> with TickerProviderStateMixin {
   late TabController _tabController;
   CodeController? _templateController;
+  final TextEditingController _templateTextController = TextEditingController();
   final Map<String, TextEditingController> _variableControllers = {};
   final ScrollController _scrollController = ScrollController();
   bool _isGenerating = false;
@@ -32,6 +33,7 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
   void dispose() {
     _tabController.dispose();
     _templateController?.dispose();
+    _templateTextController.dispose();
     for (final controller in _variableControllers.values) {
       controller.dispose();
     }
@@ -327,17 +329,34 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey[900]
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(8),
-              ),
-              child: CodeField(
-                controller: _templateController!,
-                textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                  fontSize: 14,
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
                 ),
+              ),
+              child: TextField(
+                controller: _templateTextController,
+                decoration: InputDecoration(
+                  hintText: 'Enter your template here...\n\nExample:\nWrite a professional email to {{recipient}} about {{subject}}.\nThe tone should be {{tone}} and include {{details}}.',
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.all(16),
+                  hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
+                  ),
+                ),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                onChanged: (value) {
+                  _onTemplateChanged(value, prompt, provider);
+                },
               ),
             ),
           ),
@@ -348,6 +367,12 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
                 onPressed: () => _saveTemplate(prompt, provider),
                 icon: const Icon(Bootstrap.save, size: 16),
                 label: const Text('Save Template'),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () => _addVariable(),
+                icon: const Icon(Bootstrap.plus, size: 16),
+                label: const Text('Add Variable'),
               ),
               const SizedBox(width: 12),
               TextButton.icon(
@@ -577,6 +602,11 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
 
   void _initializeControllers(PromptModel prompt, PromptProvider provider) {
     // Initialize template controller
+    if (_templateTextController.text != prompt.template) {
+      _templateTextController.text = prompt.template;
+    }
+    
+    // Keep the old CodeController for backward compatibility (if needed)
     if (_templateController == null || _templateController!.text != prompt.template) {
       _templateController?.dispose();
       _templateController = CodeController(
@@ -615,7 +645,7 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
 
   void _saveTemplate(PromptModel prompt, PromptProvider provider) {
     final updatedPrompt = prompt.copyWith(
-      template: _templateController!.text,
+      template: _templateTextController.text,
     );
     provider.updatePrompt(updatedPrompt);
     
@@ -637,7 +667,7 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
           height: 400,
           child: SingleChildScrollView(
             child: SelectableText(
-              _templateController!.text,
+              _templateTextController.text,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontFamily: 'monospace',
               ),
@@ -754,5 +784,95 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
         ],
       ),
     );
+  }
+
+  void _onTemplateChanged(String value, PromptModel prompt, PromptProvider provider) {
+    // Extract variables from template in real-time
+    final regex = RegExp(r'\{\{([^}]+)\}\}');
+    final matches = regex.allMatches(value);
+    final newVariables = matches.map((match) => match.group(1)!.trim()).toSet().toList();
+    
+    // Update the prompt with new template
+    final updatedPrompt = prompt.copyWith(template: value);
+    
+    // Update provider with new variables
+    final currentVariables = Map<String, String>.from(provider.currentVariables);
+    
+    // Add new variables with empty values
+    for (final variable in newVariables) {
+      if (!currentVariables.containsKey(variable)) {
+        currentVariables[variable] = '';
+      }
+    }
+    
+    // Remove variables that are no longer in template
+    currentVariables.removeWhere((key, value) => !newVariables.contains(key));
+    
+    // Update provider
+    provider.updateVariables(currentVariables);
+    
+    // Mark as having unsaved changes
+    provider.updatePrompt(updatedPrompt);
+  }
+
+  void _addVariable() {
+    final cursorPosition = _templateTextController.selection.start;
+    
+    // Show dialog to enter variable name
+    showDialog(
+      context: context,
+      builder: (context) {
+        String variableName = '';
+        return AlertDialog(
+          title: const Text('Add Variable'),
+          content: TextField(
+            decoration: const InputDecoration(
+              labelText: 'Variable Name',
+              hintText: 'Enter variable name (without braces)',
+            ),
+            onChanged: (value) {
+              variableName = value;
+            },
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (variableName.isNotEmpty) {
+                  _insertVariable(variableName, cursorPosition);
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _insertVariable(String variableName, int cursorPosition) {
+    final currentText = _templateTextController.text;
+    final variableText = '{{$variableName}}';
+    
+    String newText;
+    int newCursorPosition;
+    
+    if (cursorPosition >= 0 && cursorPosition <= currentText.length) {
+      newText = currentText.substring(0, cursorPosition) +
+          variableText +
+          currentText.substring(cursorPosition);
+      newCursorPosition = cursorPosition + variableText.length;
+    } else {
+      newText = currentText + variableText;
+      newCursorPosition = newText.length;
+    }
+    
+    _templateTextController.text = newText;
+    _templateTextController.selection = TextSelection.collapsed(offset: newCursorPosition);
   }
 } 
