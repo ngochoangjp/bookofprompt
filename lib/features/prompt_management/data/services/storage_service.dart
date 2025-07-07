@@ -54,7 +54,7 @@ class StorageService {
       final executableDir = File(Platform.resolvedExecutable).parent.path;
       
       // Check if running from Enigma Virtual Box or similar virtualizer
-      if (await _isVirtualizedEnvironment()) {
+      if (await isVirtualizedEnvironment()) {
         print('WARNING: Detected virtualized environment (Enigma Virtual Box?)');
         print('Portable mode may not work correctly. Using Documents folder instead.');
         
@@ -78,7 +78,7 @@ class StorageService {
   }
 
   // Detect if running in virtualized environment (Enigma Virtual Box, etc.)
-  static Future<bool> _isVirtualizedEnvironment() async {
+  static Future<bool> isVirtualizedEnvironment() async {
     try {
       final executablePath = Platform.resolvedExecutable;
       final executableDir = File(executablePath).parent.path;
@@ -216,6 +216,25 @@ class StorageService {
   // Get current database file path for user information
   static Future<String> getCurrentDatabasePath() async {
     return await getDatabasePath();
+  }
+
+  // Check if portable mode is available (has write permission)
+  static Future<bool> isPortableModeAvailable() async {
+    try {
+      final executableDir = File(Platform.resolvedExecutable).parent.path;
+      final testPath = join(executableDir, 'test_write_portable.tmp');
+      final testFile = File(testPath);
+      
+      try {
+        await testFile.writeAsString('test');
+        await testFile.delete();
+        return true;
+      } catch (e) {
+        return false;
+      }
+    } catch (e) {
+      return false;
+    }
   }
 
 

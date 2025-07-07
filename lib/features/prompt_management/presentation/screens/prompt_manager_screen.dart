@@ -624,7 +624,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     final mode = await StorageService.getStorageMode();
     final path = await StorageService.getCurrentDatabasePath();
     final portable = await StorageService.isPortableModeAvailable();
-    final virtualized = await _checkVirtualizedEnvironment();
+    final virtualized = await StorageService.isVirtualizedEnvironment();
     
     setState(() {
       _currentStorageMode = mode;

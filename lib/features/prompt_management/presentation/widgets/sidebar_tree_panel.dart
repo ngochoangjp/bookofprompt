@@ -227,6 +227,7 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
             color: Theme.of(context).colorScheme.primary,
             size: 18,
           ),
+          trailing: const SizedBox.shrink(), // Remove the default expansion arrow
           title: Row(
             children: [
               Expanded(
