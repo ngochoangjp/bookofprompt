@@ -566,6 +566,16 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
           ),
           onTap: () => _showDuplicateFolderDialog(folder, provider),
         ),
+        PopupMenuItem(
+          child: Row(
+            children: [
+              const Icon(Bootstrap.arrow_right_circle, size: 16),
+              const SizedBox(width: 8),
+              const Text('Move to Folder'),
+            ],
+          ),
+          onTap: () => _showMoveFolderDialog(folder, provider),
+        ),
         const PopupMenuDivider(),
         PopupMenuItem(
           child: Row(
@@ -898,6 +908,71 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
               }
             },
             child: const Text('Duplicate'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMoveFolderDialog(PromptFolder folder, PromptProvider provider) {
+    String? selectedFolderId = folder.parentId;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Move "${folder.name}"'),
+        content: DropdownButtonFormField<String>(
+          value: selectedFolderId,
+          decoration: const InputDecoration(
+            labelText: 'Move to Folder',
+            helperText: 'Select the destination folder',
+          ),
+          items: [
+            // Add "Root" option for moving to root level
+            const DropdownMenuItem(
+              value: 'root',
+              child: Row(
+                children: [
+                  Icon(Bootstrap.house, size: 16),
+                  SizedBox(width: 8),
+                  Text('Root (No parent folder)'),
+                ],
+              ),
+            ),
+            ...provider.folders
+                .where((f) => f.id != folder.id) // Exclude the folder being moved
+                .map((f) {
+              return DropdownMenuItem(
+                value: f.id,
+                child: Row(
+                  children: [
+                    Icon(Bootstrap.folder, size: 16),
+                    const SizedBox(width: 8),
+                    Text(f.name),
+                  ],
+                ),
+              );
+            }),
+          ],
+          onChanged: (value) {
+            selectedFolderId = value;
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (selectedFolderId != null) {
+                // Convert 'root' to an actual root folder ID or handle specially
+                final targetFolderId = selectedFolderId == 'root' ? 'general' : selectedFolderId!;
+                provider.moveFolderToParent(folder.id, targetFolderId);
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Move'),
           ),
         ],
       ),
