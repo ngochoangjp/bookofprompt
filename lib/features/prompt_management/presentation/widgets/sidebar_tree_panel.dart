@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:icons_plus/icons_plus.dart';
+import 'dart:async';
 import '../providers/prompt_provider.dart';
 import '../../data/models/prompt_model.dart';
 
@@ -14,11 +15,13 @@ class SidebarTreePanel extends StatefulWidget {
 class _SidebarTreePanelState extends State<SidebarTreePanel> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  Timer? _searchDebounceTimer;
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _searchDebounceTimer?.cancel();
     super.dispose();
   }
 
@@ -133,10 +136,19 @@ class _SidebarTreePanelState extends State<SidebarTreePanel> {
           ),
         ),
         onChanged: (value) {
-          context.read<PromptProvider>().setSearchQuery(value);
+          // Use debounced search to prevent cursor jumping
+          _debounceSearch(value);
         },
       ),
     );
+  }
+
+  // Add debounced search functionality to prevent cursor jumping
+  void _debounceSearch(String query) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      context.read<PromptProvider>().setSearchQuery(query);
+    });
   }
 
   Widget _buildTreeView() {

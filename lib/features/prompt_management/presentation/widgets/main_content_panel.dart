@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
+import 'dart:async';
 
 import '../providers/prompt_provider.dart';
 import '../../data/models/prompt_model.dart';
@@ -19,14 +20,29 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
   CodeController? _templateController;
   final TextEditingController _templateTextController = TextEditingController();
   final Map<String, TextEditingController> _variableControllers = {};
+  final Map<String, FocusNode> _variableFocusNodes = {};
+  final FocusNode _templateFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   bool _isGenerating = false;
   String _generatedPrompt = '';
+  
+  // Focus tracking to prevent cursor jumping
+  bool _isEditingTemplate = false;
+  bool _isEditingVariable = false;
+  String? _lastPromptId;
+  Timer? _debounceTemplateTimer;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    
+    // Add focus listeners to track editing state
+    _templateFocusNode.addListener(() {
+      setState(() {
+        _isEditingTemplate = _templateFocusNode.hasFocus;
+      });
+    });
   }
 
   @override
@@ -34,10 +50,15 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
     _tabController.dispose();
     _templateController?.dispose();
     _templateTextController.dispose();
+    _templateFocusNode.dispose();
     for (final controller in _variableControllers.values) {
       controller.dispose();
     }
+    for (final focusNode in _variableFocusNodes.values) {
+      focusNode.dispose();
+    }
     _scrollController.dispose();
+    _debounceTemplateTimer?.cancel();
     super.dispose();
   }
 
@@ -339,6 +360,7 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
               ),
               child: TextField(
                 controller: _templateTextController,
+                focusNode: _templateFocusNode,
                 decoration: InputDecoration(
                   hintText: 'Enter your template here...\n\nExample:\nWrite a professional email to {{recipient}} about {{subject}}.\nThe tone should be {{tone}} and include {{details}}.',
                   border: InputBorder.none,
@@ -455,6 +477,7 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
 
   Widget _buildVariableField(String variable, PromptProvider provider) {
     final controller = _variableControllers[variable]!;
+    final focusNode = _variableFocusNodes[variable]!;
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -482,6 +505,7 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
             const SizedBox(height: 12),
             TextField(
               controller: controller,
+              focusNode: focusNode,
               decoration: InputDecoration(
                 hintText: 'Enter value for $variable',
                 border: OutlineInputBorder(
@@ -601,9 +625,19 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
   }
 
   void _initializeControllers(PromptModel prompt, PromptProvider provider) {
-    // Initialize template controller
-    if (_templateTextController.text != prompt.template) {
+    // Check if this is a new prompt
+    final isNewPrompt = _lastPromptId != prompt.id;
+    _lastPromptId = prompt.id;
+    
+    // Initialize template controller - avoid updating if currently editing
+    if (!_isEditingTemplate && _templateTextController.text != prompt.template) {
+      final currentSelection = _templateTextController.selection;
       _templateTextController.text = prompt.template;
+      
+      // Try to preserve cursor position if reasonable
+      if (currentSelection.isValid && currentSelection.baseOffset <= prompt.template.length) {
+        _templateTextController.selection = currentSelection;
+      }
     }
     
     // Keep the old CodeController for backward compatibility (if needed)
@@ -618,26 +652,52 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
     final templateVariables = prompt.templateVariables;
     final currentVariables = provider.currentVariables;
 
-    // Remove controllers for variables that no longer exist
+    // Remove controllers and focus nodes for variables that no longer exist
     _variableControllers.removeWhere((key, controller) {
       if (!templateVariables.contains(key)) {
         controller.dispose();
+        _variableFocusNodes[key]?.dispose();
+        _variableFocusNodes.remove(key);
         return true;
       }
       return false;
     });
 
-    // Add controllers for new variables
+    // Add controllers and focus nodes for new variables
     for (final variable in templateVariables) {
       if (!_variableControllers.containsKey(variable)) {
         _variableControllers[variable] = TextEditingController(
           text: currentVariables[variable] ?? '',
         );
+        
+        // Create focus node for this variable
+        final focusNode = FocusNode();
+        _variableFocusNodes[variable] = focusNode;
+        
+        // Add focus listener to track editing state
+        focusNode.addListener(() {
+          setState(() {
+            _isEditingVariable = _variableFocusNodes.values.any((node) => node.hasFocus);
+          });
+        });
       } else {
-        // Update existing controller if value changed
+        // Update existing controller if value changed and not currently editing
         final currentValue = currentVariables[variable] ?? '';
+        final focusNode = _variableFocusNodes[variable];
+        
+        if (!isNewPrompt && focusNode != null && focusNode.hasFocus) {
+          // Skip update if this variable is currently being edited
+          continue;
+        }
+        
         if (_variableControllers[variable]!.text != currentValue) {
+          final currentSelection = _variableControllers[variable]!.selection;
           _variableControllers[variable]!.text = currentValue;
+          
+          // Try to preserve cursor position if reasonable
+          if (currentSelection.isValid && currentSelection.baseOffset <= currentValue.length) {
+            _variableControllers[variable]!.selection = currentSelection;
+          }
         }
       }
     }
@@ -787,6 +847,14 @@ class _MainContentPanelState extends State<MainContentPanel> with TickerProvider
   }
 
   void _onTemplateChanged(String value, PromptModel prompt, PromptProvider provider) {
+    // Use debounce to prevent excessive updates
+    _debounceTemplateTimer?.cancel();
+    _debounceTemplateTimer = Timer(const Duration(milliseconds: 300), () {
+      _processTemplateChange(value, prompt, provider);
+    });
+  }
+  
+  void _processTemplateChange(String value, PromptModel prompt, PromptProvider provider) {
     // Extract variables from template in real-time
     final regex = RegExp(r'\{\{([^}]+)\}\}');
     final matches = regex.allMatches(value);

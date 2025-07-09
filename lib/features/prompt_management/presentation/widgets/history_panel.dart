@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 import '../providers/prompt_provider.dart';
 import '../../data/models/prompt_model.dart';
 
@@ -18,11 +19,13 @@ class _HistoryPanelState extends State<HistoryPanel> {
   final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
   String _selectedFilter = 'all'; // all, today, week, month
+  Timer? _searchDebounceTimer;
 
   @override
   void dispose() {
     _searchController.dispose();
     _scrollController.dispose();
+    _searchDebounceTimer?.cancel();
     super.dispose();
   }
 
@@ -130,9 +133,8 @@ class _HistoryPanelState extends State<HistoryPanel> {
               ),
             ),
             onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
+              // Use debounced search to prevent cursor jumping
+              _debounceSearch(value);
             },
           ),
           const SizedBox(height: 12),
@@ -172,6 +174,16 @@ class _HistoryPanelState extends State<HistoryPanel> {
         ],
       ),
     );
+  }
+
+  // Add debounced search functionality to prevent cursor jumping
+  void _debounceSearch(String query) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      setState(() {
+        _searchQuery = query;
+      });
+    });
   }
 
   Widget _buildHistoryList() {
